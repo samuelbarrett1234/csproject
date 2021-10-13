@@ -5,11 +5,10 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 
 ## How to use this repository
 
-- Create an SQLite database by running `create_db.sql`.
-- In the `load/` folder you will find scripts for loading the data.
+- Firstly you need to create a new database object by running `create_db.sql` in SQLite, and then, depending on the type of data you are loading, pick a script in the `load/` folder you will find scripts for loading the data.
     - `load/random.py` creates a randomly generated dataset, for testing/comparison/control purposes
 - Once the data has been loaded, call `pair_up.py`, which creates pairings of the data points to train on (recall that the NCD method operates on pairs of inputs). This makes use of a _comma code_.
-- Once the data has been paired-up, it's time to start compressing it. Since compressors are basically string-to-string functions, the script to perform this is called `map.py`.
+- Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
 It applies the compressor to all of the data in the DB.
 Some compressors have to train first, like the BERT compressor.
 - Once you have invoked the relevant compressors, `compute_ncd.py` will use the compressibilities achieved to compute all of the different NCD similarities we are interested in.
@@ -18,6 +17,6 @@ Some compressors have to train first, like the BERT compressor.
 
 ## What to expect
 
-- Where applicable, scripts are designed to be no-ops when called twice in succession.
+- There is one database file for each dataset (where _dataset_ is taken to mean labelled, partitioned sequences over some predetermined alphabet). Note that it is permitted to have many labellings per dataset.
 - Where possible the scripts are parallelised. There should be no reason to want to run scripts in parallel.
 - Scripts are mostly organised by their "axis of parameterisation". Specifically, there are many independent things we would like to compare (the possibility of a dataset having many labels, the compressor itself, the NCD formula, and the classification method given the dissimilarities).
