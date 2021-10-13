@@ -5,6 +5,7 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 
 ## How to use this repository
 
+- Create an SQLite database by running `create_db.sql`.
 - In the `load/` folder you will find scripts for loading the data.
     - `load/random.py` creates a randomly generated dataset, for testing/comparison/control purposes
 - Once the data has been loaded, call `pair_up.py`, which creates pairings of the data points to train on (recall that the NCD method operates on pairs of inputs). This makes use of a _comma code_.
@@ -19,4 +20,4 @@ Some compressors have to train first, like the BERT compressor.
 
 - Where applicable, scripts are designed to be no-ops when called twice in succession.
 - Where possible the scripts are parallelised. There should be no reason to want to run scripts in parallel.
-- Scripts are mostly organised by their "axis of parameterisation". Specifically, there are many independent things we would like to compare (the compressor itself, the NCD formula, and the classification method given the dissimilarities).
+- Scripts are mostly organised by their "axis of parameterisation". Specifically, there are many independent things we would like to compare (the possibility of a dataset having many labels, the compressor itself, the NCD formula, and the classification method given the dissimilarities).
