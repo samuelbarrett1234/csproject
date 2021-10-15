@@ -34,7 +34,7 @@ def nearest_neighbour(db):
         FROM TrainingPairings
         GROUP BY seqid_other, lbltype, ncd_formula, compid
     )
-    SELECT lbltype, ncd_formula, compid, seqid, lbl FROM Labellings
+    SELECT DISTINCT lbltype, ncd_formula, compid, seqid, lbl FROM Labellings
     """)
     return cur.fetchall()
 
