@@ -5,7 +5,7 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 
 ## How to use this repository
 
-- Firstly you need to create a new database object by running `create_db.sql` in SQLite, and then, depending on the type of data you are loading, pick a script in the `load/` folder you will find scripts for loading the data.
+- Pick a script in the `load/` folder to create a new DB and load the data.
     - `load/random.py` creates a randomly generated dataset, for testing/comparison/control purposes
 - Once the data has been loaded, call `pair_up.py`, which creates pairings of the data points to train on (recall that the NCD method operates on pairs of inputs). This makes use of a _comma code_.
 - Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
