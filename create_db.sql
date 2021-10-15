@@ -57,13 +57,12 @@ CREATE INDEX seq_pair_right ON SequencePairings(seqid_right, seqid_left, seqid_o
 CREATE TABLE Compressors(
     compid INTEGER PRIMARY KEY,
     compname TEXT NOT NULL,  -- the name of the compressor
-    -- if recording evaluations of a compressor throughout training,
-    -- record the iteration number here:
-    compiteration INTEGER NOT NULL DEFAULT 0,
     -- if the compressor relies on randomness and you want to do repeats,
     -- store the index of the repeat here:
     comprepeat INTEGER NOT NULL DEFAULT 0,
-    compd INTEGER NOT NULL  -- the size of the compressor's output alphabet
+    compdate TEXT NOT NULL,  -- date time of script invocation for creating this compressor
+    compd INTEGER NOT NULL,  -- the size of the compressor's output alphabet
+    UNIQUE(compname, comprepeat)
 );
 
 CREATE TABLE CompressionSizes(
