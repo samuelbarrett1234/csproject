@@ -9,7 +9,7 @@ will be bytes!
 from compressors.base import Compressor
 
 
-class CompressorBlock(Compressor):
+class Block(Compressor):
     def __init__(self, n):
         self.n = n
 

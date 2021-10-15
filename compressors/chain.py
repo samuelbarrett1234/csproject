@@ -88,7 +88,7 @@ def _lazy_iterate(compressor, old_iter, shuffle):
     return new_iter
 
 
-class CompressorChain(Compressor):
+class Chain(Compressor):
     def __init__(self, compressors):
         assert(all(map(lambda c: issubclass(type(c), Compressor), compressors)))
         self.compressors = compressors
