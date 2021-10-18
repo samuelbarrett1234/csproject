@@ -4,6 +4,7 @@ It is expected that this data is incompressible.
 
 
 import os
+import sys
 import time
 import random
 import argparse as ap
@@ -32,8 +33,17 @@ if __name__ == "__main__":
         print("Error: ", args.db, "exists. This script creates a new DB.")
         exit(-1)
 
+    create_db_sql = os.path.join(os.path.dirname(sys.argv[0]), "create_db.sql")
+    if not os.path.isfile(create_db_sql):
+        print("Error: cannot find the DB creation script `create_db.sql`.",
+              "Expected at:", create_db_sql)
+        exit(-1)
+
     db = sql.connect(args.db)
     cur = db.cursor()
+
+    with open(create_db_sql, "r") as f:
+        cur.execute(f.read())
 
     seq_ids = list(range(args.n_seqs))
     seq_parts = [0] * int(args.n_seqs * 0.8) + [1] * int(args.n_seqs)
