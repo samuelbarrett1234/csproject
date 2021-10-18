@@ -36,11 +36,19 @@ CREATE TABLE SequenceValues(
     PRIMARY KEY(seqid, svidx)
 );
 
+CREATE TABLE LabelDictionary(
+    lbltype INTEGER NOT NULL,
+    lbl INTEGER NOT NULL,
+    lblval TEXT NULL,  -- a textual representation of the label
+    PRIMARY KEY(lbltype, lbl)
+);
+
 CREATE TABLE Labels(
     -- INVARIANT: any referenced `seqid` has `seq_is_pair == 0`.
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
     lbltype INTEGER NOT NULL,
-    lbl INTEGER NOT NULL
+    lbl INTEGER NOT NULL,
+    FOREIGN KEY (lbltype, lbl) REFERENCES LabelDictionary(lbltype, lbl)
 );
 
 CREATE TABLE SequencePairings(
