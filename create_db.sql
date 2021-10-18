@@ -56,7 +56,8 @@ CREATE TABLE SequencePairings(
     -- `seqid_left.seq_is_pair = 0`, `seqid_right.seq_is_pair = 0`
     seqid_out INTEGER PRIMARY KEY REFERENCES Sequences(seqid) ON DELETE CASCADE,
     seqid_left INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
-    seqid_right INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE
+    seqid_right INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
+    UNIQUE(seqid_left, seqid_right)  -- the ORDERED pair is unique
 );
 
 CREATE INDEX seq_pair_left ON SequencePairings(seqid_left, seqid_right, seqid_out);
