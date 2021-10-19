@@ -31,7 +31,7 @@ class Node:
                                the decision to keep, and 1 elsewhere.
             entropy_budget (float): The entropy budget, > 0.
         """
-        assert(entropy_budget > 0.0)
+        assert(entropy_budget >= 0.0)
         assert(len(mask) == len(keep))
         assert(np.all(np.logical_or(
             mask == 0, keep == 1

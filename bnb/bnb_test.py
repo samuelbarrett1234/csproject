@@ -4,11 +4,21 @@ Test the whole B&B algorithm.
 
 
 import random
+import pytest
 import numpy as np
 from bnb import NodeFrontier
 
 
-def test_simple():
+@pytest.mark.parametrize("N,ent_bud", [
+    (10, 4.2),
+    (5, 7.3),  # masking everything fits into the budget
+    (1000, 15.2),  # large
+    (10, 4.0),  # integral budget
+    (10, 1.1),  # small budget
+    (10, 0.9),  # nothing can be masked
+    (10, 0.0),  # nothing can be masked
+    ])
+def test_simple(N, ent_bud):
     N = 10  # seq len
     ent_bud = 4.2  # entropy budget
     answer = min(N, int(ent_bud))
