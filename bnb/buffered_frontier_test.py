@@ -8,9 +8,10 @@ class MockNodeFrontier:
         self.updated = False
 
     def done(self):
-        return False
+        return self.updated
 
     def get_updates(self):
+        assert(not self.done())
         return [1, 2], [3, 4]
 
     def update(self, ls):

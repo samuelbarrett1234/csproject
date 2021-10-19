@@ -33,7 +33,7 @@ class NodeFrontierBatch:
 
         self.frontiers = list(map(_buffer_frontier, init_frontiers))
 
-        self.seqs = np.stack(sequences, dtype=np.int32)
+        self.seqs = np.stack(sequences)
         self.seq_len = len(sequences[0])
         self.mask_value = mask_value
         self.batch_size = batch_size
@@ -58,8 +58,8 @@ class NodeFrontierBatch:
 
         result_seqs = self.mask_value * np.ones((self.batch_size, self.seq_len),
                                                 dtype=np.int32)
-        result_seqs[:len(masks), :] = self._apply_mask(
-            np.stack(masks, axis=0),
+        result_seqs[:len(self.cur_sources), :] = self._apply_mask(
+            np.stack(masks, axis=0)[:len(self.cur_sources), :],
             np.array(self.cur_sources, dtype=np.int32)
         )
 
@@ -100,14 +100,16 @@ class NodeFrontierBatch:
 
 
 def _zigzag_frontiers(fs):
-    """Given a list of buffered frontiers, yield updates from them one-by-one,
+    """Given a list of *BUFFERED* frontiers, yield updates from them one-by-one,
     until they are all exhausted.
 
     Yields: 2-tuples of the form (<masking-vector>, <original-index-of-frontier-in-`fs`>)
     """
-    assert(all(map(lambda f: isinstance(f, BufferedNodeFrontier), fs)))
     fs = list(zip(fs, range(len(fs))))  # keep original locations around
     fs2 = []  # double-buffering for `fs`
+    # preprocessing step: return any frontiers which are finished
+    # before we even do anything
+    fs = [f for f in fs if not f[0].done()]
     while len(fs) > 0:
         for f in fs:
             m = f[0].pop_update()

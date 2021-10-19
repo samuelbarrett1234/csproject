@@ -26,9 +26,11 @@ class BufferedNodeFrontier:
 
 
     def _reset_out_q(self):
-        u, o = self.frontier.get_updates()
-        self.out_q = u + o  # (`o` is optional, thus must go second)
-        self.num_popped_required = len(u)  # must pop all required updates
+        # if we are done then don't add any work
+        if not self.done():
+            u, o = self.frontier.get_updates()
+            self.out_q = u + o  # (`o` is optional, thus must go second)
+            self.num_popped_required = len(u)  # must pop all required updates
 
 
     def done(self):

@@ -13,7 +13,7 @@ from bnb import NodeFrontier
     (10, 0.9),  # nothing can be masked
     (10, 0.0),  # nothing can be masked
     ])
-def test_simple(N, ent_bud):
+def test_frontier_simple(N, ent_bud):
     answer = min(N, int(ent_bud))
 
     nf = NodeFrontier(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
