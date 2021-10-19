@@ -19,8 +19,6 @@ from bnb import NodeFrontier
     (10, 0.0),  # nothing can be masked
     ])
 def test_simple(N, ent_bud):
-    N = 10  # seq len
-    ent_bud = 4.2  # entropy budget
     answer = min(N, int(ent_bud))
 
     nf = NodeFrontier(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
