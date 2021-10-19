@@ -1,8 +1,3 @@
-"""
-Test the whole B&B algorithm.
-"""
-
-
 import random
 import pytest
 import numpy as np
