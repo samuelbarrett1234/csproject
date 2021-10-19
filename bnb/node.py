@@ -36,6 +36,8 @@ class Node:
         assert(np.all(np.logical_or(
             mask == 0, keep == 1
         )))
+        assert(mask.dtype == np.int32)
+        assert(keep.dtype == np.int32)
         self.mask = mask
         self.keep = keep
         self.budget = entropy_budget
@@ -89,7 +91,7 @@ class Node:
                 self.keep == 0,
                 np.logical_and(entropies > self.budget, self.remaining == 1)
             ),
-            1, 0
+            0, 1
         )
         self._update_remaining()
 
@@ -109,9 +111,12 @@ class Node:
         self._dual = sum(self.keep)
         assert(self._primal <= self._dual)
 
-        # finally, detect change in the dual (we may get improvement by
-        # re-running if and only if the dual improves)
-        return (self._dual < old_dual)
+        # finally, return whether or not the caller should re-invoke this
+        # after running the model again.
+        # we do this iff we can feasibly make improvements.
+        # we can do that iff the dual was strictly improved, but we are not
+        # yet terminal (solved).
+        return (self._dual < old_dual and not self.terminal())
 
 
     def masking(self):
@@ -170,7 +175,7 @@ class Node:
         has decided what to do (mask or keep) and 1 for all entries which
         are yet undecided.
         """
-        return np.remaining
+        return self.remaining
 
 
     def terminal(self):

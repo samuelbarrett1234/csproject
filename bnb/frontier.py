@@ -40,8 +40,11 @@ class NodeFrontier:
             A 2-tuple of lists of 0-1 masking vectors.
         """
         assert(not self.done())
-        t, b = [n.masking() for n in self.tightening] + [n.conditioned_masking() for n in self.branching]
-        return t + [b[0]], b[1:]
+        t, b = [n.masking() for n in self.tightening], [n.conditioned_masking() for n in self.branching]
+        if len(b) > 0:
+            return t + [b[0]], b[1:]
+        else:
+            return t, []
 
 
     def update(self, results):
