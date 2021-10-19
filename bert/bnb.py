@@ -98,11 +98,11 @@ class Node:
         cum_sums = np.cumsum(entropies[idxs])
         i = np.searchsorted(cum_sums, self.budget, side='right')
         idxs = idxs[:i]
-        greedy_mask = np.copy(self.mask)
-        greedy_mask[idxs] = 1
+        self._primal_value = np.copy(self.mask)
+        self._primal_value[idxs] = 1
 
         # then also update the masking vectors
-        self._primal = sum(greedy_mask)
+        self._primal = sum(self._primal_value)
         self._dual = sum(self.keep)
         assert(self._primal <= self._dual)
 
@@ -192,7 +192,7 @@ class Node:
         """Return a vector which masks `primal()` tokens and satisfies the
         entropy budget constraints.
         """
-        return self.mask
+        return self._primal_value
 
 
 class NodeFrontier:
@@ -209,6 +209,15 @@ class NodeFrontier:
         self.terminated = []
 
 
+    def done(self):
+        """Returns true iff the optimisation has finished. This is the case precisely
+        when all nodes are terminated and of maximal value.
+        """
+        d = self.dual()
+        return (all(map(lambda n: n.dual() == d and n.primal() == d, self.terminated))
+                and len(self.tightening) == 0 and len(self.branching) == 0)
+
+
     def get_updates(self):
         """Get the masking schemes to run the model on next. Note that these are
         separated into two: those which you MUST run, and those which you MAY
@@ -217,6 +226,7 @@ class NodeFrontier:
         Returns:
             A 2-tuple of lists of 0-1 masking vectors.
         """
+        assert(not self.done())
         t, b = [n.masking() for n in self.tightening] + [n.conditioned_masking() for n in self.branching]
         return t + [b[0]], b[1:]
 
@@ -284,3 +294,171 @@ class NodeFrontier:
         for n in self.tightening + self.branching + self.terminated:
             if n.primal() == p:
                 return n.primal_value()
+
+
+class BufferedNodeFrontier:
+    """This is a version of the node frontier with simpler "handling".
+    By this, it means you don't need to worry about grouping together
+    the inputs to pass to `update`. In other words, `get_updates` and
+    `update` are rephrased to be push/pop-like, operating one-seq-at-a-time.
+    """
+    def __init__(self, frontier):
+        self.frontier = frontier
+        self.out_q, self.in_q = [], []
+        self.num_popped = 0
+        self.num_popped_required = 0
+        # initialise with the first updates
+        self._reset_out_q()
+
+
+    def _reset_out_q(self):
+        u, o = self.frontier.get_updates()
+        self.out_q = u + o  # (`o` is optional, thus must go second)
+        self.num_popped_required = len(u)  # must pop all required updates
+
+
+    def done(self):
+        # if we are in the middle of receiving results (num_popped > 0)
+        # then we are certainly not done; else delegate to `self.frontier`.
+        if self.num_popped == 0:
+            return self.frontier.done()
+        else:
+            return False
+
+
+    def pop_update(self):
+        if len(self.out_q) == 0:
+            return None  # no update available
+        self.num_popped += 1
+        return self.out_q.pop(0)
+
+
+    def push_update(self, entropies):
+        self.in_q.append(entropies)
+        # we should update the frontier if and only if:
+        # (i) all of the vectors we expect to see (=`num_popped`) have been seen,
+        # (ii) sufficiently many vectors have been extracted
+        if len(self.in_q) == self.num_popped and self.num_popped >= self.num_popped_required:
+            self.frontier.update(self.in_q)
+            self.in_q = []
+            self.num_popped = 0
+            self._reset_out_q()
+
+
+    def dual(self):
+        return self.frontier.dual()
+
+
+    def primal(self):
+        return self.frontier.primal()
+
+
+    def primal_value(self):
+        return self.frontier.primal_value()
+
+
+def _zigzag_frontiers(fs):
+    """Given a list of buffered frontiers, yield updates from them one-by-one,
+    until they are all exhausted.
+
+    Yields: 2-tuples of the form (<masking-vector>, <original-index-of-frontier-in-`fs`>)
+    """
+    assert(all(map(lambda f: isinstance(f, BufferedNodeFrontier), fs)))
+    fs = list(zip(fs, range(len(fs))))  # keep original locations around
+    fs2 = []  # double-buffering for `fs`
+    while len(fs) > 0:
+        for f in fs:
+            m = f[0].pop_update()
+            if m is not None:
+                yield m, f[1]
+                fs2.append(f)
+            # else drop `f`, as it is exhausted
+        fs = fs2
+        fs2 = []
+
+
+class NodeFrontierBatch:
+    """This allows you to work on several independent node frontiers in
+    parallel, such that the calls to the model are always yielded in
+    multiples of the batch size. This class will also encapsulate sequence
+    masking, so you must provide it with the sequences that the frontiers
+    are modelling.
+    """
+    def __init__(self, init_frontiers, sequences, mask_value, batch_size):
+        """Create a batch of frontiers from the given list of initial
+        states.
+        """
+        # check that the sequences map to the frontiers in 1:1 correspondence
+        # and that all sequences are of the same length
+        assert(len(sequences) == len(init_frontiers))
+        assert(all(map(lambda s: len(s) == len(sequences[0]), sequences[1:])))
+
+        # note: all frontiers must be buffered!
+        def _buffer_frontier(f):
+            if not isinstance(f, BufferedNodeFrontier):
+                return BufferedNodeFrontier(f)
+            else:
+                return f
+
+        self.frontiers = list(map(_buffer_frontier, init_frontiers))
+
+        self.seqs = np.stack(sequences, dtype=np.int32)
+        self.seq_len = len(sequences[0])
+        self.mask_value = mask_value
+        self.batch_size = batch_size
+        self.cur_sources = []  # list of indices
+
+
+    def get_updates(self):
+        """Compute the next set of sequences and masks to run the model on.
+
+        Returns:
+            np.ndarray of shape (self.batch_size, self.seq_len).
+        """
+        assert(not self.done())
+
+        masks = np.zeros((self.batch_size, self.seq_len))
+
+        # extract up to `self.batch_size` new sequences to run on
+        self.cur_sources = []
+        for i, m in zip(range(self.batch_size), _zigzag_frontiers(self.frontiers)):
+            masks[i, :] = m[0]
+            self.cur_sources.append(m[1])
+
+        result_seqs = self.mask_value * np.ones((self.batch_size, self.seq_len),
+                                                dtype=np.int32)
+        result_seqs[:len(masks), :] = self._apply_mask(
+            np.stack(masks, axis=0),
+            np.array(self.cur_sources, dtype=np.int32)
+        )
+
+        # if we couldn't find enough, then we must extend the batch
+        # arbitrarily to be the right size, but we need to make a note
+        # of this fact
+        self.cur_sources += [None] * (self.batch_size - len(self.cur_sources))
+
+        return result_seqs
+
+
+    def update(self, entropies):
+        assert(entropies.shape == (self.batch_size, self.seq_len))
+        for i, entropy in zip(self.cur_sources, entropies):
+            if i is not None:
+                self.frontiers[i].push_update(entropy)
+
+
+    def _apply_mask(self, mask, idxs):
+        seqs = np.take(self.seqs, idxs, axis=0)
+        return np.where(mask == 1, self.mask_value, seqs)
+
+
+    def done(self):
+        return all(map(lambda f: f.done(), self.frontiers))
+
+
+    def solutions(self):
+        assert(self.done())
+        return self._apply_mask(
+            np.stack([f.primal_value() for f in self.frontiers], axis=0),
+            np.array(range(len(self.frontiers)), dtype=np.int32)
+        )
