@@ -20,3 +20,9 @@ Some compressors have to train first, like the BERT compressor.
 - There is one database file for each dataset (where _dataset_ is taken to mean labelled, partitioned sequences over some predetermined alphabet). Note that it is permitted to have many labellings per dataset.
 - Where possible the scripts are parallelised. There should be no reason to want to run scripts in parallel.
 - Scripts are mostly organised by their "axis of parameterisation". Specifically, there are many independent things we would like to compare (the possibility of a dataset having many labels, the compressor itself, the NCD formula, and the classification method given the dissimilarities).
+
+## Repository structure
+- The files in the root of the repository are all executable scripts.
+- The files in the `load/` folder are all executable scripts.
+- The `compressors` folder is a package, containing compression algorithms.
+- The `bnb` folder is a package, containing code for solving the Branch and Bound optimisation problem for masking.
