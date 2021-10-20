@@ -64,6 +64,9 @@ if __name__ == "__main__":
     cur.executemany("INSERT INTO SequenceValues(seqid, svidx, tokid) VALUES (?, ?, ?)",
                     gen_seqs())
 
+    cur.executemany("INSERT INTO LabelTypes(lbltype) VALUES (?)",
+                    map(lambda i: (i,), range(args.n_lbl_types)))
+
     cur.executemany("INSERT INTO LabelDictionary(lbltype, lbl) VALUES (?, ?)",
                     zip(range(args.n_lbl_types), range(2, args.n_lbl_types + 2)))
 

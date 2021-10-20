@@ -36,8 +36,13 @@ CREATE TABLE SequenceValues(
     PRIMARY KEY(seqid, svidx)
 );
 
+CREATE TABLE LabelTypes(
+    lbltype INTEGER PRIMARY KEY,
+    lbltype_name TEXT NULL
+);
+
 CREATE TABLE LabelDictionary(
-    lbltype INTEGER NOT NULL,
+    lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype) ON DELETE CASCADE,
     lbl INTEGER NOT NULL,
     lblval TEXT NULL,  -- a textual representation of the label
     PRIMARY KEY(lbltype, lbl)
@@ -46,7 +51,7 @@ CREATE TABLE LabelDictionary(
 CREATE TABLE Labels(
     -- INVARIANT: any referenced `seqid` has `seq_is_pair == 0`.
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
-    lbltype INTEGER NOT NULL,
+    lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype) ON DELETE CASCADE,
     lbl INTEGER NOT NULL,
     FOREIGN KEY (lbltype, lbl) REFERENCES LabelDictionary(lbltype, lbl)
 );
@@ -96,7 +101,7 @@ CREATE TABLE Predictions(
     compid TEXT NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
     ncd_formula TEXT NOT NULL,
     predictor TEXT NOT NULL,
-    lbltype INTEGER NOT NULL,
+    lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype) ON DELETE CASCADE,
     lbl INTEGER NOT NULL,
     PRIMARY KEY(lbltype, predictor, ncd_formula, compid, seqid)
 );
