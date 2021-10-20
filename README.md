@@ -3,6 +3,11 @@ My Fourth Year CS Project at the University of Oxford.
 In this repository I have implemented a framework for testing different compression algorithms' abilities to classify data via the _normalised compression distance_ method.
 Included in the compression algorithms are novel BERT-based ones that I have developed.
 
+## Setup
+
+- Install the requirements given in `requirements.txt`.
+- Open the Python shell, run `import nltk` then `nltk.download('punkt')`.
+
 ## How to use this repository
 
 - Pick a script in the `load/` folder to create a new DB and load the data.

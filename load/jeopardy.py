@@ -10,6 +10,7 @@ import bisect
 import argparse as ap
 import sqlite3 as sql
 import progressbar as pgb
+from nltk.tokenize import word_tokenize
 
 
 class Alphabet:
@@ -28,8 +29,7 @@ class Alphabet:
 
 
 def parse_question(s):
-    assert(s[0] == "'" and s[-1] == "'")
-    return s[1:-1].split()
+    return word_tokenize(s)
 
 
 def labels(row):
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("db", type=str,
                         help="Filename of the DB to create.")
-    parser.add_argument("jeopardy-json", type=str,
+    parser.add_argument("jeopardy", type=str,
                         help="Path to the Jeopardy dataset JSON file.")
     args = parser.parse_args()
 
@@ -57,11 +57,11 @@ if __name__ == "__main__":
         print("Error: ", args.db, "exists. This script creates a new DB.")
         exit(-1)
 
-    if not os.path.isfile(args.jeopardy_json):
-        print("Error: ", args.jeopardy_json, "does not exist.")
+    if not os.path.isfile(args.jeopardy):
+        print("Error: ", args.jeopardy, "does not exist.")
         exit(-1)
 
-    create_db_sql = os.path.join(os.path.dirname(sys.argv[0]), "create_db.sql")
+    create_db_sql = os.path.join(os.path.dirname(sys.argv[0]), "../", "create_db.sql")
     if not os.path.isfile(create_db_sql):
         print("Error: cannot find the DB creation script `create_db.sql`.",
               "Expected at:", create_db_sql)
@@ -71,13 +71,13 @@ if __name__ == "__main__":
     cur = db.cursor()
 
     with open(create_db_sql, "r") as f:
-        cur.execute(f.read())
+        cur.executescript(f.read())
 
     seqid = 0
     alphabet = Alphabet()
     lbl_types = {}
     lbl_type_ids = Alphabet()
-    with open(args.jeopardy_json, "r") as f:
+    with open(args.jeopardy, "r") as f:
         js = json.load(f)
 
         # 80/10/10 data split
