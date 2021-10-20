@@ -26,3 +26,7 @@ Some compressors have to train first, like the BERT compressor.
 - The files in the `load/` folder are all executable scripts.
 - The `compressors` folder is a package, containing compression algorithms.
 - The `bnb` folder is a package, containing code for solving the Branch and Bound optimisation problem for masking.
+
+# Datasets
+- The `load/random.py` data loader is clearly not associated with any dataset in particular, and just generates arbitrary data for testing.
+- The `load/jeopardy.py` dataset can be downloaded from [the JSON file linked here](https://www.reddit.com/r/datasets/comments/1uyd0t/200000_jeopardy_questions_in_a_json_file/).
