@@ -1,5 +1,5 @@
-"""This script randomly generates data, to be used as a baseline.
-It is expected that this data is incompressible.
+"""This script loads the Jeopardy dataset. Available from
+https://www.reddit.com/r/datasets/comments/1uyd0t/200000_jeopardy_questions_in_a_json_file/
 """
 
 
