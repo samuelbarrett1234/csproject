@@ -123,7 +123,7 @@ if __name__ == "__main__":
         INSERT INTO LabelTypes(lbltype_name, lbltype) VALUES (?, ?)
     """, lbl_type_ids.iterate())
     for lbltype_name, lbl_alphabet in lbl_types.items():
-        lbltype = lbl_types[lbltype_name]
+        lbltype = lbl_type_ids.at(lbltype_name)
         cur.executemany("""
             INSERT INTO LabelDictionary(lbltype, lblval, lbl)
             VALUES (?, ?, ?)
