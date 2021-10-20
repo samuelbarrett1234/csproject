@@ -61,6 +61,8 @@ if __name__ == "__main__":
         exit(-1)
 
     db = sql.connect(args.db)
+    cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     for name, func in METRICS.items():
         out_fname = os.path.join(args.folder, name + ".txt")

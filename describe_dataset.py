@@ -19,6 +19,7 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     cur.execute("SELECT COUNT(*) FROM Sequences")
     print("Total dataset size is", cur.fetchone()[0])

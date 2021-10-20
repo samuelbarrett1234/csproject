@@ -41,10 +41,11 @@ if __name__ == "__main__":
         exit(-1)
 
     db = sql.connect(args.db)
+    cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     # Start by getting the vocab size
 
-    cur = db.cursor()
     cur.execute("SELECT MAX(tokid) + 1 FROM Alphabet")
     alphabet_size = cur.fetchone()[0]
 

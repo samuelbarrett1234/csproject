@@ -62,6 +62,7 @@ if __name__ == "__main__":
             yield (name,) + row
 
     cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
     cur.executemany("""
     INSERT INTO Predictions(predictor, lbltype, ncd_formula, compid, seqid, lbl)
     VALUES (?, ?, ?, ?, ?, ?)

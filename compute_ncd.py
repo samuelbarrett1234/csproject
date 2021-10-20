@@ -43,8 +43,9 @@ if __name__ == "__main__":
         exit(-1)
 
     db = sql.connect(args.db)
-
     cur1 = db.cursor()
+    cur1.execute("PRAGMA FOREIGN_KEYS = ON")
+
     cur1.execute("""
     SELECT XY.compsz AS xy_compsz, X.compsz AS x_compsz, Y.compsz AS y_compsz,
     seqid_out AS seqid, XY.compid

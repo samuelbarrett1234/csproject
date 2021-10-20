@@ -41,6 +41,7 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     with open(create_db_sql, "r") as f:
         cur.executescript(f.read())
