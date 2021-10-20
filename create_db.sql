@@ -36,6 +36,8 @@ CREATE TABLE SequenceValues(
     PRIMARY KEY(seqid, svidx)
 );
 
+CREATE INDEX seq_vals_idx ON SequenceValues(tokid, seqid);
+
 CREATE TABLE LabelTypes(
     lbltype INTEGER PRIMARY KEY,
     lbltype_name TEXT NULL
@@ -55,6 +57,8 @@ CREATE TABLE Labels(
     lbl INTEGER NOT NULL,
     FOREIGN KEY (lbltype, lbl) REFERENCES LabelDictionary(lbltype, lbl)
 );
+
+CREATE INDEX lbl_idx ON Labels(lbl, seqid);
 
 CREATE TABLE SequencePairings(
     -- INVARIANT: `seqid_out.seq_is_pair = 1`,

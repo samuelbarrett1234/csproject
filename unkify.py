@@ -23,6 +23,9 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
+    cur.execute("BEGIN TRANSACTION")
+    cur.execute("PRAGMA DEFER_FOREIGN_KEYS = ON")
 
     # ASSUMPTION: every element of the alphabet is mentioned
     # at least *somewhere*.
@@ -31,20 +34,22 @@ if __name__ == "__main__":
     # (we need to do this, because otherwise the introduction
     # of an extra UNK token would create exactly the problem
     # that this script purports to solve.)
+    cur.execute("CREATE TEMP TABLE BadTokIds(tokid INTEGER PRIMARY KEY)")
     cur.execute("""
-        CREATE TEMPORARY VIEW BadTokIds AS (
-            SELECT tokid
-            FROM SequenceValues NATURAL JOIN Sequences
-            WHERE seqpart = 0
-            GROUP BY tokid
-            HAVING COUNT(seqid) <= 1
-        )
+        INSERT INTO BadTokIds(tokid)
+        SELECT tokid
+        FROM SequenceValues NATURAL JOIN Sequences
+        WHERE seqpart = 0
+        GROUP BY tokid
+        HAVING COUNT(seqid) <= 1
     """)
     cur.execute("""
         SELECT 1 FROM BadTokIds
     """)
     if cur.fetchone() is not None:
         print("UNKifying the alphabet...")
+        cur.execute("SELECT COUNT(*) FROM BadTokIds")
+        print("[UNKifying", cur.fetchone()[0], "words]")
 
         # create UNK character
         cur.execute("""
@@ -90,32 +95,35 @@ if __name__ == "__main__":
         print("Did not need to UNK the sequence alphabet.")
 
     # Now update the labels - similar procedure to the alphabet
+    # # sanity check: do we even need an UNK?
+    # (see explanation earlier)
+    cur.execute("CREATE TEMP TABLE BadLbls(lbltype INTEGER, lbl INTEGER, PRIMARY KEY (lbltype, lbl))")
+    cur.execute("""
+        INSERT INTO BadLbls(lbltype, lbl)
+        SELECT lbltype, lbl
+        FROM Labels NATURAL JOIN Sequences
+        WHERE seqpart = 0
+        GROUP BY lbltype, lbl
+        HAVING COUNT(seqid) <= 1
+    """)
     cur.execute("SELECT lbltype, lbltype_name FROM LabelTypes")
     lbl_types = cur.fetchall()
     for lbltype, lbltype_name in lbl_types:
-        # sanity check: do we even need an UNK?
-        # (see explanation earlier)
         cur.execute("""
-            CREATE TEMPORARY VIEW BadLbls AS (
-                SELECT lbl
-                FROM Labels NATURAL JOIN Sequences
-                WHERE seqpart = 0
-                GROUP BY lbl
-                HAVING COUNT(seqid) <= 1
-            )
-        """)
-        cur.execute("""
-            SELECT 1 FROM BadLbls
-        """)
+            SELECT 1 FROM BadLbls WHERE lbltype = ?
+        """, (lbltype,))
         if cur.fetchone() is not None:
-            print("UNKifying label type", lbltype_name)
+            print("UNKifying label type:", lbltype_name)
+            cur.execute("SELECT COUNT(*) FROM BadLbls WHERE lbltype = ?",
+                        (lbltype,))
+            print("[UNKifying", cur.fetchone()[0], "labels]")
 
             # create UNK character
             cur.execute("""
                 INSERT INTO LabelDictionary(lbltype, lbl, lblval)
-                SELECT MAX(lbl) + 1, "<<UNK>>", ?
-                WHERE lbltype = ?
+                SELECT ?, MAX(lbl) + 1, "<<UNK>>"
                 FROM LabelDictionary
+                WHERE lbltype = ?
             """, (lbltype, lbltype))
             cur.execute("""
                 SELECT MAX(lbl) FROM LabelDictionary WHERE lbltype = ?
@@ -125,11 +133,11 @@ if __name__ == "__main__":
             cur.execute("""
                 UPDATE Labels
                 SET lbl = ?
-                WHERE EXISTS (
+                WHERE lbltype = ? AND EXISTS (
                     SELECT 1 FROM BadLbls
-                    WHERE BadLbls.lbl = Labels.lbl
+                    WHERE BadLbls.lbl = Labels.lbl AND BadLbls.lbltype = Labels.lbltype
                 )
-            """, (unkid,))
+            """, (unkid, lbltype))
             # now for the tricky part:
             # remove the unused labels and make the result contiguous
             cur.execute("""
@@ -137,25 +145,26 @@ if __name__ == "__main__":
                 WHERE NOT EXISTS (
                     SELECT 1 FROM Labels
                     WHERE Labels.lbl = LabelDictionary.lbl
+                    AND Labels.lbltype = LabelDictionary.lbltype
                 )
             """)
             cur.execute("""
-                SELECT lbl FROM LabelDictionary ORDER BY lbl ASC
-            """)
-            update = list(enumerate(map(lambda t: t[0], cur.fetchall())))
+                SELECT lbl FROM LabelDictionary WHERE lbltype = ? ORDER BY lbl ASC
+            """, (lbltype,))
+            update = list(map(lambda t: (t[0], t[1][0], lbltype), enumerate(cur.fetchall())))
             cur.executemany("""
                 UPDATE LabelDictionary
-                SET lbl = ? WHERE lbl = ?
+                SET lbl = ?
+                WHERE lbl = ? AND lbltype = ?
             """, update)
             cur.executemany("""
                 UPDATE Labels
-                SET lbl = ? WHERE lbl = ?
+                SET lbl = ?
+                WHERE lbl = ? AND lbltype = ?
             """, update)
         else:
             print("Did not need to UNK the label type", lbltype_name)
 
-        # clear the namespace for the next label type
-        cur.execute("DROP VIEW BadLbls")
-
+    cur.execute("COMMIT")
     db.commit()
     db.close()
