@@ -8,12 +8,12 @@ import os
 import itertools
 import argparse as ap
 import sqlite3 as sql
-import progressbar2 as pgb
+import progressbar as pgb
 
 
 def add_sequences(db, comma_id, iter):
     cur = db.cursor()
-    cur.execute("SELECT MAX(seqid) + 1 FROM Sentences")
+    cur.execute("SELECT MAX(seqid) + 1 FROM Sequences")
     next_seq_id = cur.fetchone()[0]
     for seq_left, seq_right, seqpart_out in iter:
         # create a new sequence entry
@@ -28,7 +28,7 @@ def add_sequences(db, comma_id, iter):
         """, (next_seq_id, seq_left))
         # get leftmost sequence length
         cur.execute("""
-            SELECT MAX(svidx) + 1 FROM SequenceVallues WHERE seqid = ?
+            SELECT MAX(svidx) + 1 FROM SequenceValues WHERE seqid = ?
         """, (seq_left,))
         seq_left_sz = cur.fetchone()[0]
         # insert comma
@@ -47,7 +47,7 @@ def add_sequences(db, comma_id, iter):
 
 def get_reflexive_sequences(db):  # get all sequences matched in a pair with themselves
     cur = db.cursor()
-    cur.execute("SELECT seqid, seqpart FROM Sequences")
+    cur.execute("SELECT seqid, seqpart FROM Sequences WHERE seq_is_pair = 0")
     return map(lambda t: (t[0], t[0], t[1]), cur.fetchall())
 
 
@@ -59,14 +59,16 @@ def get_evaluation_sequences(db):  # get all nontrain sequences paired with a tr
         SELECT A.seqid, B.seqid, A.seqpart
         FROM Sequences AS A JOIN Sequences AS B
         ON A.seqpart != B.seqpart
-        WHERE A.seqpart != 0
+        WHERE A.seqpart != 0 AND A.seq_is_pair = 0
+        AND B.seq_is_pair = 0
 
         UNION ALL
 
         SELECT A.seqid, B.seqid, B.seqpart
         FROM Sequences AS A JOIN Sequences AS B
         ON A.seqpart != B.seqpart
-        WHERE B.seqpart != 0
+        WHERE B.seqpart != 0 AND A.seq_is_pair = 0
+        AND B.seq_is_pair = 0
     """)
     return cur.fetchall()
 
@@ -78,6 +80,7 @@ def get_all_train_sequences(db):  # get all train sequences paired with all othe
         FROM Sequences AS A JOIN Sequences AS B
         ON A.seqid != B.seqid
         WHERE A.seqpart = 0 AND B.seqpart = 0
+        AND A.seq_is_pair = 0 AND B.seq_is_pair = 0
     """)
     return cur.fetchall()
 
@@ -86,14 +89,17 @@ def get_cyclic_shift_train_pairing(db):  # match the nth train sequence with the
     cur = db.cursor()
     cur.execute("""
         SELECT seqid FROM Sequences
-        WHERE seqpart = 0
+        WHERE seqpart = 0 AND seq_is_pair = 0
         ORDER BY seqid ASC
     """)
     last_seqid = None
-    for seqid in cur.fetchall():
+    for i, seqid in enumerate(cur.fetchall()):
         seqid = seqid[0]
         if last_seqid is not None:
-            yield(last_seqid, seqid, 0)
+            if i % 2 == 0:  # sometimes yield either <x,y> or <y,x>
+                yield(last_seqid, seqid, 0)
+            else:
+                yield(seqid, last_seqid, 0)
         last_seqid = seqid
 
 
@@ -124,22 +130,21 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur = db.cursor()
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     # create a new comma character
     cur.execute("SELECT MAX(tokid) + 1 FROM Alphabet")
     comma_id = cur.fetchone()[0]
-    cur.execute("INSERT INTO Alphabet(tokid, tokval) VALULES (?, ?)",
+    cur.execute("INSERT INTO Alphabet(tokid, tokval) VALUES (?, ?)",
                 (comma_id, '<COMMA>'))
 
     add_sequences(
         db, comma_id,
         pgb.progressbar(
             itertools.chain(
-                [
-                    get_reflexive_sequences(db),
-                    get_evaluation_sequences(db),
-                    TRAIN_SET_POLICY[args.policy](db)
-                ]
+                get_reflexive_sequences(db),
+                get_evaluation_sequences(db),
+                TRAIN_SET_POLICY[args.policy](db)
             )
         )
     )
