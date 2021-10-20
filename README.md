@@ -6,7 +6,7 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 ## How to use this repository
 
 - Pick a script in the `load/` folder to create a new DB and load the data.
-    - `load/random.py` creates a randomly generated dataset, for testing/comparison/control purposes
+    - `load/gen_random.py` creates a randomly generated dataset, for testing/comparison/control purposes
 - Once the data has been loaded, call `pair_up.py`, which creates pairings of the data points to train on (recall that the NCD method operates on pairs of inputs). This makes use of a _comma code_.
 - Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
 It applies the compressor to all of the data in the DB.
@@ -28,5 +28,5 @@ Some compressors have to train first, like the BERT compressor.
 - The `bnb` folder is a package, containing code for solving the Branch and Bound optimisation problem for masking.
 
 # Datasets
-- The `load/random.py` data loader is clearly not associated with any dataset in particular, and just generates arbitrary data for testing.
+- The `load/gen_random.py` data loader is clearly not associated with any dataset in particular, and just generates arbitrary data for testing.
 - The `load/jeopardy.py` dataset can be downloaded from [the JSON file linked here](https://www.reddit.com/r/datasets/comments/1uyd0t/200000_jeopardy_questions_in_a_json_file/).
