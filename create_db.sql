@@ -43,7 +43,7 @@ CREATE TABLE LabelTypes(
 
 CREATE TABLE LabelDictionary(
     lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype) ON DELETE CASCADE,
-    lbl INTEGER NOT NULL,
+    lbl INTEGER NOT NULL,  -- must be zero indexed, so that MAX(lbl)+1 is the number of labels
     lblval TEXT NULL,  -- a textual representation of the label
     PRIMARY KEY(lbltype, lbl)
 );
