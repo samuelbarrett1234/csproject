@@ -51,6 +51,8 @@ if __name__ == "__main__":
                         help="Filename of the DB to create.")
     parser.add_argument("jeopardy", type=str,
                         help="Path to the Jeopardy dataset JSON file.")
+    parser.add_argument("--limit", default=None, type=int,
+                        help="Limit the total size of the dataset.")
     args = parser.parse_args()
 
     if os.path.isfile(args.db):
@@ -80,8 +82,11 @@ if __name__ == "__main__":
     with open(args.jeopardy, "r") as f:
         js = json.load(f)
 
+        if args.limit is not None:
+            js = js[:min(args.limit, len(js))]
+
         # 80/10/10 data split
-        data_split = [int(0.8 * len(js)), int(0.1 * len(js))]
+        data_split = [int(0.8 * len(js)), int(0.05 * len(js))]
         data_split[1] += data_split[0]
         data_split.append(len(js) - data_split[1])
 
