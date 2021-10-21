@@ -5,7 +5,7 @@ from bnb import padded_batch, solve_mask
 def _model(seqs):
     batch_size = 32
     assert(len(seqs) == batch_size)
-    ps = np.random.random((batch_size, seqs.shape[1], 256))
+    ps = np.ones((batch_size, seqs.shape[1], 16))
     return ps / np.sum(ps, axis=-1, keepdims=True)
 
 
