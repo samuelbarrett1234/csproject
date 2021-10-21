@@ -5,12 +5,14 @@ as a single function.
 
 
 import numpy as np
+from bnb.node import Node
+from bnb.stoppable_node import StoppableNode
 from bnb.frontier import NodeFrontier
 from bnb.frontier_batch import NodeFrontierBatch
 
 
 def solve_mask(model, entropy_budget, seqs, init_keeps, mask_value,
-               batch_size):
+               batch_size, early_stopping_cond=None):
     """Solve a masking problem for the given collection of sentences.
     For efficiency, this function allows you to specify several sequences.
     Important note: the number of sequences is, in general, distinct from
@@ -43,17 +45,33 @@ def solve_mask(model, entropy_budget, seqs, init_keeps, mask_value,
         batch_size (int): The batch size the model is expected to receive, which
                           is distinct from `M`, the number of sequences provided
                           as input.
+        early_stopping_cond (optional function): Either `None` if you want to solve
+                                                 to optimality, or otherwise, it
+                                                 should be a function operating on
+                                                 two integers (primal, dual), and
+                                                 should return true for stopping
+                                                 early.
     """
     assert(not np.any(seqs == mask_value))
     assert(seqs.shape == init_keeps.shape)
     assert(entropy_budget >= 0.0)
+
+    # a function for creating the root node of a tree
+    # (the type of which depends on whether we are implementing
+    # early stopping)
+    def _create_root(init_keep):
+        init_mask = np.zeros_like(init_keep)
+        if early_stopping_cond is not None:
+            return StoppableNode(
+                init_mask, init_keep, entropy_budget,
+                early_stopping_cond)
+        else:
+            return Node(
+                init_mask, init_keep, entropy_budget)
+
     nfs = NodeFrontierBatch(
         [
-            NodeFrontier(
-                np.zeros_like(init_keep),
-                init_keep,
-                entropy_budget
-            )
+            NodeFrontier(_create_root(init_keep))
             for init_keep in init_keeps
         ],
         seqs, mask_value, batch_size

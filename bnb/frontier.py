@@ -5,9 +5,6 @@ minor modifications to the traditional workflow.
 """
 
 
-from bnb.node import Node
-
-
 class NodeFrontier:
     """Represents a collection of the above nodes, all solving the same problem
     instance. Note that this might look slightly different to normal B&B algorithms
@@ -16,8 +13,8 @@ class NodeFrontier:
     graph recompilation, it may be optimal to look ahead slightly when branching
     rather than just branching one node at a time.
     """
-    def __init__(self, mask, keep, entropy_budget):
-        self.tightening = [Node(mask, keep, entropy_budget)]
+    def __init__(self, root_node):
+        self.tightening = [root_node]
         self.branching = []
         self.terminated = []
 

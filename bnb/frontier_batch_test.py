@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from bnb import NodeFrontierBatch, NodeFrontier
+from bnb import NodeFrontierBatch, NodeFrontier, Node
 from bnb.frontier_batch import _zigzag_frontiers
 
 
@@ -43,8 +43,12 @@ def test_frontier_batch_simple(N, ent_bud):
 
     nf = NodeFrontierBatch(
         [
-            NodeFrontier(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud),
-            NodeFrontier(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
+            NodeFrontier(
+                Node(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
+            ),
+            NodeFrontier(
+                Node(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
+            )
         ],
         [
             np.zeros((N,), dtype=np.int32),

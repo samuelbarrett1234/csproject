@@ -1,7 +1,8 @@
 import random
 import pytest
 import numpy as np
-from bnb import NodeFrontier
+from bnb import (Node, StoppableNode, early_stopping_abs_gap,
+                 NodeFrontier)
 
 
 @pytest.mark.parametrize("N,ent_bud", [
@@ -16,7 +17,9 @@ from bnb import NodeFrontier
 def test_frontier_simple(N, ent_bud):
     answer = min(N, int(ent_bud))
 
-    nf = NodeFrontier(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
+    nf = NodeFrontier(
+        Node(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
+    )
     while not nf.done():
         u, o = nf.get_updates()
         # return an arbitrary number of updates between
@@ -27,3 +30,32 @@ def test_frontier_simple(N, ent_bud):
 
     assert(nf.primal() == answer)
     assert(nf.dual() == answer)
+
+
+@pytest.mark.parametrize("N,ent_bud", [
+    (10, 4.2),
+    (5, 7.3),  # masking everything fits into the budget
+    (1000, 15.2),  # large
+    (10, 4.0),  # integral budget
+    (10, 1.1),  # small budget
+    (10, 0.9),  # nothing can be masked
+    (10, 0.0),  # nothing can be masked
+    ])
+def test_frontier_early_stopping(N, ent_bud):
+    answer = min(N, int(ent_bud))
+    k = 3
+
+    nf = NodeFrontier(
+        StoppableNode(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32),
+                      ent_bud, early_stopping_abs_gap(k))
+    )
+    while not nf.done():
+        u, o = nf.get_updates()
+        # return an arbitrary number of updates between
+        # [len(u), len(u) + len(o)]
+        n = random.randint(len(u), len(u) + len(o))
+        results = np.ones((n, N))  # every token is uniformly random on {0,1}!
+        nf.update(results)
+
+    assert(answer - nf.primal() <= k)
+    assert(nf.dual() == nf.primal())
