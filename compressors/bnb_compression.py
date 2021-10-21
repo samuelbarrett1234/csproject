@@ -30,7 +30,7 @@ def serialise_l2r(seqs, pad_value):
         should be passed directly to `compress_serialisation`.
     """
     seqs, init_keep = padded_batch(seqs, pad_value)
-    mask_arrays = np.zeros((seqs.shape[1], seqs.shape[0], seqs.shape[1]), dtype=np.int32)
+    mask_arrays = np.zeros((seqs.shape[1] + 1, seqs.shape[0], seqs.shape[1]), dtype=np.int32)
     mask_arrays[0] = init_keep
     for i in range(1, mask_arrays.shape[0]):
         # at timestep i, copy the state from the last timestep
@@ -77,7 +77,7 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud):
         # heuristic: implement the stopping condition as a function
         # of the number of remaining (undecided) tokens
         k = np.min(np.sum(keep, axis=-1))
-        stop_cond = lambda p, d: (d - p <= k // 2 and p > k)
+        stop_cond = lambda p, d: (d - p <= max(0, k // 2 - 4) and p > k)
 
         # only kept around for assertion checking
         old_keep = keep
@@ -113,7 +113,7 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
     of matrices over the outer dimension must be well-ordered: once a position
     is unmasked it can never be masked again. The first mask matrix should be
     all ones, except possibly if there are any padding characters, which must
-    be unmasked from the beginning.
+    be unmasked from the beginning. The last mask matrix must be all-zero.
 
     Args:
         model (callable): A function which is run on integer matrices of shape
@@ -131,6 +131,7 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
         List of Lists of Ints: Returns the d-ary Huffman codes for each sequence
                                in the batch.
     """
+    assert(np.all(mask_arrays[-1] == 0))
     codes = [[] for i in range(seqs.shape[0])]
     last_seqs = None
     last_masks = None
@@ -153,12 +154,13 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
             # (we do not need a comma character because Huffman codes
             # form prefix codes.)
             for i in range(len(codes)):
+                print(new[i])
                 codes[i] += _compute_joint_code(
-                    ps[i, new[i], :],
-                    seqs[i],
+                    ps[i, new[i] == 1, :],
+                    seqs[i][new[i] == 1],
                     d
                 )
-        last_seqs = np.where(mask_arrays == 1, mask_value, seqs)
+        last_seqs = np.where(masks == 1, mask_value, seqs)
         last_masks = masks
 
     return codes
@@ -200,6 +202,7 @@ def _compute_joint_code(indep_dists, seq, d):
     # (we can only make this simplification because we don't
     # actually care about implementing a decoder, only the
     # fact that there exists a decoding algorithm.)
-    log_p = np.sum(np.log(np.take(indep_dists, seq, axis=-1)))
+    idxs = np.arange(0, len(seq), dtype=np.int32)
+    log_p = np.sum(np.log(indep_dists[idxs, seq]))
     K = np.ceil(-(log_p / np.log(d))).astype(np.int32)
-    return list(np.random.randint(0, d-1, size=(K,)))
+    return list(np.random.randint(0, d, size=(K,)))
