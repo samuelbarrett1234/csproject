@@ -32,7 +32,7 @@ def test_zigzag_frontier():
 @pytest.mark.parametrize("N,ent_bud", [
     (10, 4.2),
     (5, 7.3),  # masking everything fits into the budget
-    (1000, 15.2),  # large
+    (100, 15.2),  # large
     (10, 4.0),  # integral budget
     (10, 1.1),  # small budget
     (10, 0.9),  # nothing can be masked

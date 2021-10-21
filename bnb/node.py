@@ -99,8 +99,9 @@ class Node:
         # into the mask as the entropy budget will allow - obviously
         # this is achieved by sorting the singleton entropies and
         # then greedily going up the list until the cumsum doesn't fit)
-        idxs = np.argsort(np.where(self.remaining == 1, entropies, np.inf))
-        cum_sums = np.cumsum(entropies[idxs])
+        ent_if_possible = np.where(self.remaining == 1, entropies, np.inf)
+        idxs = np.argsort(ent_if_possible)
+        cum_sums = np.cumsum(ent_if_possible[idxs])
         i = np.searchsorted(cum_sums, self.budget, side='right')
         idxs = idxs[:i]
         self._primal_value = np.copy(self.mask)
