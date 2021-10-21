@@ -11,6 +11,46 @@ import progressbar as pgb
 from compressors.base import Compressor
 
 
+def _compute_codebook(d, tokens):
+    """Compute the Huffman codebook of output-alphabet-size `d`
+    and with token probabilities/occurrences `tokens`.
+
+    Args:
+        d (int): The arity of the code. Use d=2 for binary.
+        tokens (dict): A dictionary mapping tokens (as keys) to
+                       probabilities or occurrences.
+
+    Returns:
+        dict: A dictionary mapping tokens to prefix-free lists of
+              integers between 0 and d-1.
+    """
+    h = [(v, [(k, [])]) for k, v in tokens.items()]
+    heapq.heapify(h)
+
+    while len(h) > 1:
+        # pop up to `d` least-likely elements
+        xs = []
+        for i in range(d):
+            xs.append(heapq.heappop(h))
+            if len(h) == 0:
+                break
+        
+        # now join their codes together
+        heapq.heappush(h, (
+            # the new probability is the sum of the old ones
+            sum(map(lambda t: t[0], xs)),
+            # union all of the codebooks
+            list(itertools.chain(
+                # but don't forget to prepend a new code element
+                map(
+                    lambda i, v_codes: [(k, [i] + code) for k, code in v_codes[1]],
+                enumerate(xs))
+            ))
+        ))
+
+    return dict(h[0][1])
+
+
 class Huffman(Compressor):
     def __init__(self, d):
         self.d = d
@@ -30,31 +70,7 @@ class Huffman(Compressor):
             tok_occ[t] += 1
 
         # now compute the prefix-free codebook:
-        h = [(v, [(k, [])]) for k, v in tok_occ.items()]
-        heapq.heapify(h)
-
-        while len(h) > 1:
-            # pop up to `d` least-likely elements
-            xs = []
-            for i in range(self.d):
-                xs.append(heapq.heappop(h))
-                if len(h) == 0:
-                    break
-            
-            # now join their codes together
-            heapq.heappush(h, (
-                # the new probability is the sum of the old ones
-                sum(map(lambda t: t[0], xs)),
-                # union all of the codebooks
-                list(itertools.chain(
-                    # but don't forget to prepend a new code element
-                    map(
-                        lambda i, v_codes: [(k, [i] + code) for k, code in v_codes[1]],
-                    enumerate(xs))
-                ))
-            ))
-
-        self.codebook = dict(h[0][1])
+        self.codebook = _compute_codebook(self.d, tok_occ)
 
         return self.d
 
