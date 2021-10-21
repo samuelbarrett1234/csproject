@@ -78,7 +78,7 @@ def solve_mask(model, entropy_budget, seqs, init_keeps, mask_value,
     )
 
     def _ent(ps):  # entropy
-        return -np.sum(np.where(ps > 0.0, ps * np.log(ps), 0.0), axis=-1)
+        return -np.sum((np.ma.log(ps) * ps).filled(0.0), axis=-1)
 
     while not nfs.done():
         nfs.update(_ent(model(nfs.get_updates())))
