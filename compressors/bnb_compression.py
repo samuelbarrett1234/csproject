@@ -74,11 +74,6 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud):
 
     # repeat until everything is unmasked:
     while not np.all(mask_arrays[-1] == 0):
-        # heuristic: implement the stopping condition as a function
-        # of the number of remaining (undecided) tokens
-        k = np.min(np.sum(keep, axis=-1))
-        stop_cond = lambda p, d: (d - p <= max(0, k // 2 - 4) and p > k)
-
         # only kept around for assertion checking
         old_keep = keep
 
@@ -86,8 +81,7 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud):
         # resulting `keep` state:
         keep = np.where(solve_mask(
             model, ent_bud, seqs, keep,
-            mask_value, seqs.shape[0],
-            early_stopping_cond=stop_cond
+            mask_value, seqs.shape[0]
         ) == mask_value, 1, 0)
 
         # we MUST make progress at each iteration,
