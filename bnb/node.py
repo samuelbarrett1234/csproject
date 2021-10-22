@@ -42,6 +42,7 @@ class Node:
         self.keep = keep
         self.budget = entropy_budget
         self._primal = sum(mask)
+        self._primal_value = mask
         self._dual = sum(keep)
         assert(self._primal <= self._dual)
         self._update_remaining()

@@ -14,9 +14,13 @@ class NodeFrontier:
     rather than just branching one node at a time.
     """
     def __init__(self, root_node):
-        self.tightening = [root_node]
+        self.tightening = []
         self.branching = []
         self.terminated = []
+        if root_node.terminal():
+            self.terminated.append(root_node)
+        else:
+            self.tightening.append(root_node)
 
 
     def done(self):

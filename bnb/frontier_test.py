@@ -82,3 +82,12 @@ def test_frontier_nontrivial_initial_state():
 
     assert(nf.primal() == answer)
     assert(nf.dual() == answer)
+
+
+def test_frontier_with_terminal_root():
+    nf = NodeFrontier(
+        Node(np.zeros((1,), dtype=np.int32),
+             np.zeros((1,), dtype=np.int32),
+             0.0)
+    )
+    assert(nf.done())
