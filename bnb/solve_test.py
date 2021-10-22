@@ -34,19 +34,39 @@ def test_solve_mask_early_stopping():
                early_stopping_cond=lambda p, d: (d - p <= 3))
 
 
-def _complex_model(seqs):
-    assert(seqs.shape[1] == 5)
-    result = 0.5 * np.ones((seqs.shape[0], seqs.shape[1], 2))
-    know1 = np.any(seqs[:, :3] != 3, axis=-1)
-    know2 = np.any(seqs[:, 3:] != 3, axis=-1)
-    result[know1, :3, 0] = 1.0
-    result[know1, :3, 1] = 0.0
-    result[know2, 3:, 1] = 1.0
-    result[know2, 3:, 0] = 0.0
-    return result
-
-
 def test_solve_complex():
+    def _complex_model(seqs):
+        assert(seqs.shape[1] == 5)
+        result = 0.5 * np.ones((seqs.shape[0], seqs.shape[1], 2))
+        know1 = np.any(seqs[:, :3] != 3, axis=-1)
+        know2 = np.any(seqs[:, 3:] != 3, axis=-1)
+        result[know1, :3, 0] = 1.0
+        result[know1, :3, 1] = 0.0
+        result[know2, 3:, 1] = 1.0
+        result[know2, 3:, 0] = 0.0
+        return result
     seqs = np.array([0, 0, 0, 1, 1], dtype=np.int32)[np.newaxis, :]
     result = solve_mask(_complex_model, np.log(2), seqs, np.ones_like(seqs), 3, 8)
     assert(np.sum(np.where(result == 3, 1, 0)) == 4)
+
+
+def test_solve_complex_2():
+    def _complex_model(seqs):
+        assert(seqs.shape[1] == 10)
+        result = np.ones((seqs.shape[0], seqs.shape[1], 3))
+        result[:, :5, 2] = 0
+        result /= np.sum(result, axis=-1, keepdims=True)
+        know1 = np.any(seqs[:, :3] != 3, axis=-1)
+        know2 = np.any(seqs[:, 3:5] != 3, axis=-1)
+        know3 = np.any(seqs[:, 5:] != 3, axis=-1)
+        result[know1, :3, 0] = 1.0
+        result[know1, :3, 1] = 0.0
+        result[know2, 3:5, 1] = 1.0
+        result[know2, 3:5, 0] = 0.0
+        result[know3, 5:, 0] = 0.0
+        result[know3, 5:, 1] = 0.0
+        result[know3, 5:, 2] = 1.0
+        return result
+    seqs = np.array([0, 0, 0, 1, 1, 2, 2, 2, 2, 2], dtype=np.int32)[np.newaxis, :]
+    result = solve_mask(_complex_model, np.log(2) + 0.01, seqs, np.ones_like(seqs), 3, 8)
+    assert(np.sum(np.where(result == 3, 1, 0)) == 8)
