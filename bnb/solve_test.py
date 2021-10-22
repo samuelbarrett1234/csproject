@@ -1,5 +1,5 @@
 import numpy as np
-from bnb import padded_batch, solve_mask
+from bnb import padded_batch, solve, solve_mask
 
 
 def _model(seqs):
@@ -32,3 +32,21 @@ def test_solve_mask_early_stopping():
     seqs = np.random.randint(0, 7, size=(4, 48))
     solve_mask(_model, 14.3, seqs, np.ones_like(seqs), 8, 32,
                early_stopping_cond=lambda p, d: (d - p <= 3))
+
+
+def _complex_model(seqs):
+    assert(seqs.shape[1] == 5)
+    result = 0.5 * np.ones((seqs.shape[0], seqs.shape[1], 2))
+    know1 = np.any(seqs[:, :3] != 3, axis=-1)
+    know2 = np.any(seqs[:, 3:] != 3, axis=-1)
+    result[know1, :3, 0] = 1.0
+    result[know1, :3, 1] = 0.0
+    result[know2, 3:, 1] = 1.0
+    result[know2, 3:, 0] = 0.0
+    return result
+
+
+def test_solve_complex():
+    seqs = np.array([0, 0, 0, 1, 1], dtype=np.int32)[np.newaxis, :]
+    result = solve_mask(_complex_model, np.log(2), seqs, np.ones_like(seqs), 3, 8)
+    assert(np.sum(np.where(result == 3, 1, 0)) == 4)

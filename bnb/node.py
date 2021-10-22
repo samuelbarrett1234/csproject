@@ -38,8 +38,8 @@ class Node:
         )))
         assert(mask.dtype == np.int32)
         assert(keep.dtype == np.int32)
-        self.mask = mask
-        self.keep = keep
+        self.mask = np.copy(mask)
+        self.keep = np.copy(keep)
         self.budget = entropy_budget
         self._primal = sum(mask)
         self._primal_value = mask
@@ -52,12 +52,12 @@ class Node:
         self.remaining = np.where(np.logical_and(self.mask == 0, self.keep == 1), 1, 0)
 
 
-    def tighten(self, entropies):
+    def tighten(self, conditioned_entropies):
         """Try to improve the primal/dual bounds of this node after running
         the model. Note that you may be able to tighten further by calling
         this function many times. The input, `entropies`, should be the
         output of running the model *CONDITIONING PRECISELY ON THE INDICES
-        WHICH ARE 0 IN THE VECTOR RETURNED BY `self.masking()`!*
+        WHICH ARE 0 IN THE VECTOR RETURNED BY `self.conditioned_masking()`!*
         This function MUST return False at some point before you stop calling
         it, because future calculations on remaining entropy budget etc rely
         on the most up-to-date information.
@@ -83,24 +83,32 @@ class Node:
         old_dual = self._dual
 
         # also store this for later:
-        self.entropies = entropies
+        self.conditioned_entropies = conditioned_entropies
 
-        # automatically improve dual by putting any singleton
+        # automatically improve dual by putting a singleton
         # which does not fit into the budget into the keep set
-        self.keep = np.where(
-            np.logical_or(
-                self.keep == 0,
-                np.logical_and(entropies > self.budget, self.remaining == 1)
-            ),
-            0, 1
+        # if one exists
+        not_fit = np.argwhere(np.logical_and(
+            conditioned_entropies > self.budget, self.remaining == 1)
         )
+        if len(not_fit) > 0:
+            self.keep[not_fit[0]] = 0
         self._update_remaining()
+        self._dual = sum(self.keep)
+        assert(self._primal <= self._dual)
+
+        # if the dual has improved, but we are still not finished,
+        # tell the caller to call `tighten` again (before bothering
+        # to update the primal):
+        if self._dual < old_dual and not self.terminal():
+            return True
 
         # also compute greedy primal (by stuffing as many singletons
         # into the mask as the entropy budget will allow - obviously
         # this is achieved by sorting the singleton entropies and
         # then greedily going up the list until the cumsum doesn't fit)
-        ent_if_possible = np.where(self.remaining == 1, entropies, np.inf)
+        ent_if_possible = np.where(
+            self.remaining == 1, conditioned_entropies, np.inf)
         idxs = np.argsort(ent_if_possible)
         cum_sums = np.cumsum(ent_if_possible[idxs])
         i = np.searchsorted(cum_sums, self.budget, side='right')
@@ -110,45 +118,29 @@ class Node:
 
         # then also update the masking vectors
         self._primal = sum(self._primal_value)
-        self._dual = sum(self.keep)
         assert(self._primal <= self._dual)
 
-        # finally, return whether or not the caller should re-invoke this
-        # after running the model again.
-        # we do this iff we can feasibly make improvements.
-        # we can do that iff the dual was strictly improved, but we are not
-        # yet terminal (solved).
-        return (self._dual < old_dual and not self.terminal())
+        return False
 
 
-    def masking(self):
-        """Return a vector which is 0 at all entries which this node will
-        definitely keep (hence condition on), and 1 otherwise (i.e. you
-        should mask). If this node is terminal, then a 1 indicates you
-        *definitely* should mask (i.e. in a committal way) rather than
-        just asking you to mask for the next calculation.
-        """
-        return self.keep
-
-
-    def _branching_index(self, conditioned_entropies):
+    def _branching_index(self, entropies):
         # TODO: consider other strategies; there is no reason why
-        # the greedily-pick-the-smallest-entropy strategy below
+        # the greedily-pick-the-biggest-entropy strategy below
         # is optimal.
-        return np.argmin(
+        return np.argmax(
             np.where(
                 self.remaining == 1,
-                conditioned_entropies,
-                np.inf
+                entropies,
+                -np.inf
             )
         )
 
 
-    def branch(self, conditioned_entropies):
+    def branch(self, entropies):
         """Branch the node on the results of an extra call to the model to compute
         conditioned entropies. The input, `conditioned_entropies`, should be the
         output of running the model *CONDITIONING PRECISELY ON THE INDICES
-        WHICH ARE 0 IN THE VECTOR RETURNED BY `self.conditioned_masking()`!*
+        WHICH ARE 0 IN THE VECTOR RETURNED BY `self.masking()`!*
 
         Obviously there is no point running this if the node is terminal.
 
@@ -161,15 +153,25 @@ class Node:
             List of Node: Returns the list of nodes to branch on.
         """
         assert(not self.terminal())
-        i = self._branching_index(conditioned_entropies)
-        assert(conditioned_entropies[i] <= self.budget)  # otherwise would've been added to `keep`
+        i = self._branching_index(entropies)
+        assert(self.conditioned_entropies[i] <= self.budget)  # otherwise would've been added to `keep`
         mask1, keep2 = np.copy(self.mask), np.copy(self.keep)
         mask1[i] = 1
         keep2[i] = 0
         return [
-            Node(mask1, self.keep, self.budget - conditioned_entropies[i]),
-            Node(self.mask, keep2, self.budget - conditioned_entropies[i] + self.entropies[i])
+            Node(mask1, self.keep, self.budget - self.conditioned_entropies[i]),
+            Node(self.mask, keep2, self.budget - self.conditioned_entropies[i] + entropies[i])
         ]
+
+
+    def masking(self):
+        """Return a vector which is 0 at all entries which this node will
+        definitely keep (hence condition on), and 1 otherwise (i.e. you
+        should mask). If this node is terminal, then a 1 indicates you
+        *definitely* should mask (i.e. in a committal way) rather than
+        just asking you to mask for the next calculation.
+        """
+        return self.keep
 
 
     def conditioned_masking(self):
