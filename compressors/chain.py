@@ -26,13 +26,15 @@ def _shuffle_file_lines(file, buffer_sz=1024*8):
         for i in range(buffer_sz):
             s = file.readline()
             if s != '':
+                if s[-1] != '\n':
+                    s = s + '\n'
                 buffer.append(s)
             else:  # eof
                 end = True
                 break
         random.shuffle(buffer)
         file.seek(pos)
-        file.write("\n".join(buffer) + "\n")  # should be identical size in binary
+        file.write("".join(buffer))  # should be identical size in binary
 
 
 def _lazy_iterate(compressor, old_iter, shuffle):
