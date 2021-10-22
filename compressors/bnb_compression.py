@@ -84,10 +84,18 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud):
             mask_value, seqs.shape[0]
         ) == mask_value, 1, 0)
 
-        # we MUST make progress at each iteration,
-        # otherwise we will get stuck in a loop:
-        assert(np.any(keep < old_keep))
-        # but the progress must be monotonic:
+        # if we did not manage to keep any more than last
+        # iteration, perhaps because the entropy budget is
+        # too high, we MUST change `keep` to prevent a fixed
+        # point (hence infinite loop).
+        # rather than error, setting `keep` to all-zeroes
+        # will terminate the function, which is better than
+        # asking the user to exit the program and re-run
+        # with a smaller entropy budget!
+        if not np.any(keep < old_keep):
+            keep = np.zeros_like(keep)
+
+        # the progress must be monotonic:
         assert(np.all(keep <= old_keep))
 
         # store the new `keep` state:

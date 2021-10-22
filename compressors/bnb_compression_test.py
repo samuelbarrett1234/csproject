@@ -45,7 +45,7 @@ def test_bnb():
         np.array([1, 2, 3], dtype=np.int32),
         np.array([4, 5, 6, 7], dtype=np.int32)
     ]
-    seqs, mask_arrays = serialise_bnb(_model, seqs, 257, 0, 2.0)
+    seqs, mask_arrays = serialise_bnb(_model, seqs, 257, 0, 10.0)
     codes = compress_serialisation(_model, seqs, mask_arrays, 257, 2)
     assert(len(codes) == len(seqs))
     assert(len(codes[0]) == 3 * 8)
