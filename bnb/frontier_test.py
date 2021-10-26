@@ -91,3 +91,36 @@ def test_frontier_with_terminal_root():
              0.0)
     )
     assert(nf.done())
+
+
+def test_frontier_dual_bound_problems():
+    N = 3
+    ent_bud = 1.0
+    answer = 2
+
+    # test the frontier with a model which causes an older
+    # version of the dual bound to fail
+    nf = NodeFrontier(
+        Node(np.zeros((N,), dtype=np.int32), np.ones((N,), dtype=np.int32), ent_bud)
+    )
+    while not nf.done():
+        u, o = nf.get_updates()
+        u += o
+        u = np.stack(u)
+        results = np.zeros_like(u, dtype=np.float32)
+
+        # in this model, we have three variables X, Y and Z
+        # Y and Z are conditionally independent given X
+        # X, Y|X and Z|X have entropies/conditional entropies 0.51, 0.5, 0.5 respectively
+        # X|Y and X|Z have zero entropy
+
+        not_known = np.logical_not(np.logical_or(u[:, 0] == 0, np.logical_or(u[:, 1] == 0, u[:, 2] == 0)))
+
+        results[:, 0] = np.where(not_known, 0.51, 0.0)
+        results[:, 1] = np.where(u[:, 1] == 1, np.where(not_known, 1.01, 0.5), 0.0)
+        results[:, 2] = np.where(u[:, 2] == 1, np.where(not_known, 1.01, 0.5), 0.0)
+
+        nf.update(results)
+
+    assert(nf.primal() == answer)
+    assert(nf.dual() == answer)
