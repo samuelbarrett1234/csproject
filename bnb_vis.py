@@ -8,7 +8,8 @@ import argparse as ap
 import numpy as np
 import tensorflow as tf
 from transformers import BertTokenizer, TFBertForMaskedLM
-from compressors.bnb_compression import serialise_bnb
+from compressors.bnb_compression import (serialise_bnb, compress_serialisation,
+                                         serialise_l2r)
 
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -36,8 +37,15 @@ if __name__ == "__main__":
 
     results = serialise_bnb(_model, seqs, mask_value, pad_value, args.ent_bud,
                             keep_start_end=True)
-    results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
+    printable_results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
 
-    for seq in results[:, 0, :]:
+    for seq in printable_results[:, 0, :]:
         print(tokenizer.convert_tokens_to_string(
             map(tokenizer._convert_id_to_token, seq)))
+
+    bnb_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
+    results = serialise_l2r(seqs, pad_value)
+    l2r_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
+    print("BNB Code:", "".join(map(str, bnb_codes[0])))
+    print("Code lengths:")
+    print("BNB =", len(bnb_codes[0]), ", L2R =", len(l2r_codes[0]))

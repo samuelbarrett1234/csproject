@@ -165,7 +165,6 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
             # (we do not need a comma character because Huffman codes
             # form prefix codes.)
             for i in range(len(codes)):
-                print(new[i])
                 codes[i] += _compute_joint_code(
                     ps[i, new[i] == 1, :],
                     seqs[i][new[i] == 1],
