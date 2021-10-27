@@ -40,7 +40,8 @@ def serialise_l2r(seqs, pad_value):
     return seqs, mask_arrays
 
 
-def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud):
+def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
+                  keep_start_end=False):
     """Serialise a list of sequences according to the output of solving
     the branch-and-bound procedure.
 
@@ -60,15 +61,23 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud):
                          The smaller this is, the more messages you will
                          send, and potentially the more compressive,
                          however it will be slower.
+        keep_start_end (boolean): If true, do not mask the first and last token
+                                  of any sequence.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
         model on, and the list of masking matrices. These parameters
         should be passed directly to `compress_serialisation`.
     """
+    lens = list(map(len, seqs))
     # pad the sequences, which simultaneously gives us
     # the initial `keep` state:
     seqs, keep = padded_batch(seqs, pad_value)
+
+    # special start/end tokens must be kept if the caller indicates:
+    if keep_start_end:
+        keep[:, 0] = 0
+        keep[[i for i in range(len(lens))], [L - 1 for L in lens]] = 0
 
     mask_arrays = [keep]
 

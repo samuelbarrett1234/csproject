@@ -2,3 +2,5 @@ progressbar2
 numpy
 pytest
 nltk
+-c huggingface transformers
+-c anaconda tensorflow-gpu==2.3
