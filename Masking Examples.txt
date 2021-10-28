@@ -11,3 +11,32 @@ BNB = 164 , L2R = 209
 Code: 10000110111000111110010011111001010001111000100010000100110011011000
 Code lengths:
 BNB = 68 , L2R = 126
+
+B&B REVEAL ORDER
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] my report [MASK] about kolmogo [MASK] [MASK] , [MASK] its applications to ai [MASK] [SEP]
+[CLS] my report is about kolmogorov complexity , and its applications to ai . [SEP]
+CUT REVEAL ORDER
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] complexity [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] complexity [MASK] [MASK] [MASK] [MASK] [MASK] ai [MASK] [SEP]
+[CLS] my [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] complexity [MASK] [MASK] [MASK] [MASK] [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] complexity [MASK] [MASK] [MASK] [MASK] [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] complexity , [MASK] [MASK] [MASK] [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] complexity , [MASK] [MASK] applications [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] about [MASK] [MASK] [MASK] [MASK] complexity , [MASK] [MASK] applications [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] about [MASK] [MASK] [MASK] [MASK] complexity , and [MASK] applications [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] about [MASK] [MASK] [MASK] [MASK] complexity , and its applications [MASK] ai [MASK] [SEP]
+[CLS] my report [MASK] about [MASK] [MASK] [MASK] [MASK] complexity , and its applications to ai [MASK] [SEP]
+[CLS] my report is about [MASK] [MASK] [MASK] [MASK] complexity , and its applications to ai [MASK] [SEP]
+[CLS] my report is about [MASK]lm [MASK] [MASK] complexity , and its applications to ai [MASK] [SEP]
+[CLS] my report is about [MASK]lmogo [MASK] complexity , and its applications to ai [MASK] [SEP]
+[CLS] my report is about [MASK]lmogorov complexity , and its applications to ai [MASK] [SEP]
+[CLS] my report is about [MASK]lmogorov complexity , and its applications to ai . [SEP]
+[CLS] my report is about kolmogorov complexity , and its applications to ai . [SEP]
+[CLS] my report is about kolmogorov complexity , and its applications to ai . [SEP]
+[CLS] my report is about kolmogorov complexity , and its applications to ai . [SEP]
+BNB Code: 10000111111000110110100001100000110110010100100001011100101001001011001010101010001101100101001011000000011010010101100001110101000011000000101110111100001101000011110111101110
+Cutting Code: 1110110011100010110101001001001101000011001100111110110101010011111001101011011111100000010001000011100110111001010100010001010100101101010011010000111
+Code lengths:
+BNB = 176 , L2R = 211 Cut = 151

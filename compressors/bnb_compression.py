@@ -113,6 +113,115 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
     return seqs, np.stack(mask_arrays)
 
 
+def _batched_merge_sort(xs, batched_cmp, start=0, end=-1):
+    end %= xs.shape[1]  # turn -1 into actual end
+
+    if start == end:  # base case - nothing to do
+        pass
+
+    else:
+        mid = (start + end) // 2  # middle
+        assert(mid + 1 <= end)
+
+        # sort halves
+        _batched_merge_sort(xs, batched_cmp, start, mid)
+        _batched_merge_sort(xs, batched_cmp, mid + 1, end)
+
+        # now merge in parallel:
+
+        idx1 = np.ones((xs.shape[0],), dtype=np.int32) * start
+        idx2 = np.ones_like(idx1) * (mid + 1)
+        output = np.zeros_like(xs[:, start:end + 1])
+        i_out = 0
+
+        while np.any(idx1 <= mid) or np.any(idx2 <= end):
+            # check that every seq in the batch isn't finished yet:
+            assert(np.all(np.logical_or(idx1 <= mid, idx2 <= end)))
+            i_in = np.arange(0, idx1.shape[0], dtype=np.int32)
+
+            b = batched_cmp(
+                xs[i_in, idx1],
+                xs[i_in, idx2 % xs.shape[1]]  # safety
+            )
+            # pick idx1 if idx2 is finished or b >= 0, and idx1 is not finished
+            # (when b == 0 we can put it in either, but put it in 1 for stability)
+            update = np.logical_and(np.logical_or(b >= 0, idx2 > end), idx1 <= mid)
+            output[:, i_out] = np.where(update, xs[i_in, idx1], xs[i_in, idx2 % (end + 1)])
+            # advance the relevant indices
+            idx1[np.argwhere(update)] += 1
+            idx2[np.argwhere(np.logical_not(update))] += 1
+            # output next value
+            i_out += 1
+
+        assert(i_out == output.shape[1])
+
+        # store output back into original array
+        xs[:, start:end + 1] = output
+
+
+def serialise_cutting_sort(model, seqs, mask_value, pad_value,
+                           keep_start_end=False):
+    """Serialise a list of sequences according to the 'cutting sort order'.
+
+    Args:
+        model (callable): The model function, which takes as input a
+                          numpy array of shape (batch-size, seq-len)
+                          and outputs a probability distribution at
+                          each of those positions.
+        seqs (list of np.ndarray): A list of 1D integral vectors of
+                                   length equal to the batch size!!!
+        mask_value (int): The integer representing a masked token.
+        pad_value (int): The integer representing padding, so that the
+                         sequences can be padded to the same length and
+                         put into a batch.
+        ent_bud (float): The entropy budget - aka the minimum amount
+                         of entropy to be contained in each "new message".
+                         The smaller this is, the more messages you will
+                         send, and potentially the more compressive,
+                         however it will be slower.
+        keep_start_end (boolean): If true, do not mask the first and last token
+                                  of any sequence.
+
+    Returns:
+        A 2-tuple containing the padded batch of sequences to run the
+        model on, and the list of masking matrices. These parameters
+        should be passed directly to `compress_serialisation`.
+    """
+
+    def H(idxs1, idxs2):
+        xs = np.copy(seqs)
+        rng = np.arange(0, idxs1.shape[0], dtype=np.int32)
+        xs[:, idxs1] = mask_value
+        xs[:, idxs2] = mask_value
+        hs = model(xs)
+        hs = np.sum(-hs * np.log(hs), axis=-1)
+        hs = np.sign(hs[rng, idxs1] - hs[rng, idxs2])
+        assert(hs.shape == idxs1.shape)
+        return hs
+
+    seqs, init_keep = padded_batch(seqs, pad_value)
+
+    if keep_start_end:
+        init_keep[:, 0] = 0
+        init_keep[:, -1] = 0
+
+    n_mask_arrays = seqs.shape[1] + 2
+    if keep_start_end:
+        n_mask_arrays -= 2
+
+    mask_arrays = np.repeat(init_keep[np.newaxis, :, :], n_mask_arrays, axis=0)
+    mask_arrays[-1, :, :] = 0  # final array must be all-zeroes
+
+    idxs = np.repeat(np.arange(0, seqs.shape[1])[np.newaxis, :], seqs.shape[0], axis=0)
+    _batched_merge_sort(idxs, H)
+
+    for i in range(1, n_mask_arrays - 1):
+        for j in range(mask_arrays.shape[1]):
+            mask_arrays[i, j, idxs[j, :i]] = 0
+
+    return seqs, mask_arrays
+
+
 def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
     """Given a batch of sequences, and an order in which to compress them,
     perform that compression.

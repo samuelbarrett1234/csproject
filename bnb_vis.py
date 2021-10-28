@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 from transformers import BertTokenizer, TFBertForMaskedLM
 from compressors.bnb_compression import (serialise_bnb, compress_serialisation,
-                                         serialise_l2r)
+                                         serialise_l2r, serialise_cutting_sort)
 
 
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -37,15 +37,27 @@ if __name__ == "__main__":
 
     results = serialise_bnb(_model, seqs, mask_value, pad_value, args.ent_bud,
                             keep_start_end=True)
+    bnb_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
     printable_results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
 
+    print("B&B REVEAL ORDER")
     for seq in printable_results[:, 0, :]:
         print(tokenizer.convert_tokens_to_string(
             map(tokenizer._convert_id_to_token, seq)))
 
-    bnb_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
     results = serialise_l2r(seqs, pad_value)
     l2r_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
+
+    results = serialise_cutting_sort(_model, seqs, mask_value, pad_value, keep_start_end=True)
+    cut_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
+    printable_results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
+
+    print("CUT REVEAL ORDER")
+    for seq in printable_results[:, 0, :]:
+        print(tokenizer.convert_tokens_to_string(
+            map(tokenizer._convert_id_to_token, seq)))
+
     print("BNB Code:", "".join(map(str, bnb_codes[0])))
+    print("Cutting Code:", "".join(map(str, cut_codes[0])))
     print("Code lengths:")
-    print("BNB =", len(bnb_codes[0]), ", L2R =", len(l2r_codes[0]))
+    print("BNB =", len(bnb_codes[0]), ", L2R =", len(l2r_codes[0]), "Cut =", len(cut_codes[0]))
