@@ -76,6 +76,18 @@ def test_cutting_sort():
         np.array([4, 5, 6, 7], dtype=np.int32)
     ]
     seqs, mask_arrays = serialise_cutting_sort(_model, seqs, 257, 0)
+    assert(np.all(mask_arrays[0, :, :] == np.array([
+        [1, 1, 1, 0],
+        [1, 1, 1, 1]
+    ])))
+    assert(np.all(mask_arrays[-1, :, :] == 0))
+    assert(np.all(
+        mask_arrays[:-1, :, :] - mask_arrays[1:, :, :] >= 0
+    ))
+    assert(np.all(np.any(np.any(
+        mask_arrays[:-1, :, :] - mask_arrays[1:, :, :] == 1,
+        axis=-1
+    ), axis=-1)))
     codes = compress_serialisation(_model, seqs, mask_arrays, 257, 2)
     assert(len(codes) == len(seqs))
     assert(len(codes[0]) == 3 * 8)

@@ -205,7 +205,7 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
         init_keep[:, 0] = 0
         init_keep[:, -1] = 0
 
-    n_mask_arrays = seqs.shape[1] + 2
+    n_mask_arrays = seqs.shape[1] + 1
     if keep_start_end:
         n_mask_arrays -= 2
 
@@ -215,9 +215,13 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
     idxs = np.repeat(np.arange(0, seqs.shape[1])[np.newaxis, :], seqs.shape[0], axis=0)
     _batched_merge_sort(idxs, H)
 
-    for i in range(1, n_mask_arrays - 1):
-        for j in range(mask_arrays.shape[1]):
-            mask_arrays[i, j, idxs[j, :i]] = 0
+    for i in range(seqs.shape[0]):
+        # remove start/end/padding
+        # (need to do this separately for each element in the batch,
+        # since they may be of different lengths)
+        i_idxs = idxs[i, init_keep[i, idxs[i, :]] == 1]
+        for j in range(i_idxs.shape[0]):
+            mask_arrays[j, i, i_idxs[:j]] = 0
 
     return seqs, mask_arrays
 
