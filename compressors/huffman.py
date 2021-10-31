@@ -34,19 +34,13 @@ def _compute_codebook(d, tokens):
             xs.append(heapq.heappop(h))
             if len(h) == 0:
                 break
-        
+
+        # the new probability is the sum of the old ones
+        new_p = sum(map(lambda t: t[0], xs))
+        # union all of the codebooks
+        new_code = [(k, [i] + code) for i, t in enumerate(xs) for k, code in t[1]]
         # now join their codes together
-        heapq.heappush(h, (
-            # the new probability is the sum of the old ones
-            sum(map(lambda t: t[0], xs)),
-            # union all of the codebooks
-            list(itertools.chain(
-                # but don't forget to prepend a new code element
-                map(
-                    lambda i, v_codes: [(k, [i] + code) for k, code in v_codes[1]],
-                enumerate(xs))
-            ))
-        ))
+        heapq.heappush(h, (new_p, new_code))
 
     return dict(h[0][1])
 

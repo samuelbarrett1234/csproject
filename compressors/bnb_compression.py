@@ -12,6 +12,7 @@ into a sequence of codes.
 
 import numpy as np
 from bnb import padded_batch, solve_mask
+from compressors.huffman import _compute_codebook
 
 
 def serialise_l2r(seqs, pad_value):
@@ -315,17 +316,25 @@ def _compute_joint_code(indep_dists, seq, d):
         list: List of length K with int values in the
               range 0..d-1.
     """
-    # we know the *length* of the Huffman code, K, is given
-    # by `ceil(-log_d(probability))`.
-    # by swapping siblings around in the Huffman tree, any
-    # specific event can be represented by a code of arbitrary
-    # 1s and 0s for this fixed length.
-    # hence for the purposes of this function it suffices to
-    # compute K and randomly generate the code!
-    # (we can only make this simplification because we don't
-    # actually care about implementing a decoder, only the
-    # fact that there exists a decoding algorithm.)
-    idxs = np.arange(0, len(seq), dtype=np.int32)
-    log_p = np.sum(np.log(indep_dists[idxs, seq]))
-    K = np.ceil(-(log_p / np.log(d))).astype(np.int32)
-    return list(np.random.randint(0, d, size=(K,)))
+    # if there is only one distribution, use exact Huffman,
+    # else approximate it to avoid materialising the whole
+    # joint alphabet
+    if indep_dists.shape[0] == 1:
+        assert(seq.shape == (1,))
+        cbook = _compute_codebook(d, dict(enumerate(indep_dists[0])))
+        return cbook[seq[0]]
+    else:
+        # we know the *length* of the Huffman code, K, is given
+        # by `ceil(-log_d(probability))`.
+        # by swapping siblings around in the Huffman tree, any
+        # specific event can be represented by a code of arbitrary
+        # 1s and 0s for this fixed length.
+        # hence for the purposes of this function it suffices to
+        # compute K and randomly generate the code!
+        # (we can only make this simplification because we don't
+        # actually care about implementing a decoder, only the
+        # fact that there exists a decoding algorithm.)
+        idxs = np.arange(0, len(seq), dtype=np.int32)
+        log_p = np.sum(np.log(indep_dists[idxs, seq]))
+        K = np.ceil(-(log_p / np.log(d))).astype(np.int32)
+        return list(np.random.randint(0, d, size=(K,)))
