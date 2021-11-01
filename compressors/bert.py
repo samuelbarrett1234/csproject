@@ -19,7 +19,7 @@ import compressors.bnb_compression as bnb_compression
 import masking
 
 
-INIT_STATE = [None, 'bert-base-uncased']
+INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort']
 COMPRESSION = ['L2R', 'cutting-sort']
 

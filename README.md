@@ -10,8 +10,8 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 
 ## How to use this repository
 
-- Pick a script in the `load/` folder to create a new DB and load the data.
-    - `load/gen_random.py` creates a randomly generated dataset, for testing/comparison/control purposes
+- Pick a script in the `load/` folder to create a new DB and load the data. See below for a discussion.
+- If the dataset requires unkification, `unkify.py` does this.
 - Once the data has been loaded, call `pair_up.py`, which creates pairings of the data points to train on (recall that the NCD method operates on pairs of inputs). This makes use of a _comma code_.
 - Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
 It applies the compressor to all of the data in the DB.

@@ -10,7 +10,7 @@ import bisect
 import argparse as ap
 import sqlite3 as sql
 import progressbar as pgb
-from nltk.tokenize import word_tokenize
+from transformers import BertTokenizer
 
 
 class Alphabet:
@@ -28,8 +28,7 @@ class Alphabet:
         return self.vals.items()
 
 
-def parse_question(s):
-    return word_tokenize(s)
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 
 def labels(row):
@@ -71,13 +70,15 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur = db.cursor()
-    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     with open(create_db_sql, "r") as f:
         cur.executescript(f.read())
 
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
+    cur.execute("BEGIN TRANSACTION")
+    cur.execute("PRAGMA DEFER_FOREIGN_KEYS = ON")
+
     seqid = 0
-    alphabet = Alphabet()
     lbl_types = {}
     lbl_type_ids = Alphabet()
     with open(args.jeopardy, "r") as f:
@@ -112,11 +113,11 @@ if __name__ == "__main__":
                 """, (seqid, lbl_type_ids.at(lbl_type), lbl_types[lbl_type].at(lbl)))
 
             # compute and save the sequence values:
-            for i, s in enumerate(parse_question(row['question'])):
+            for i, s in enumerate(tokenizer(row['question'])['input_ids']):
                 cur.execute("""
                     INSERT INTO SequenceValues(seqid, svidx, tokid)
                     VALUES (?, ?, ?)
-                """, (seqid, i, alphabet.at(s)))
+                """, (seqid, i, s))
 
             # move onto next sequence
             seqid += 1
@@ -124,7 +125,7 @@ if __name__ == "__main__":
     # now save all of the alphabets and label types
     cur.executemany("""
         INSERT INTO Alphabet(tokval, tokid) VALUES (?, ?)
-    """, alphabet.iterate())
+    """, dict(tokenizer.vocab).items())
     cur.executemany("""
         INSERT INTO LabelTypes(lbltype_name, lbltype) VALUES (?, ?)
     """, lbl_type_ids.iterate())
@@ -135,5 +136,6 @@ if __name__ == "__main__":
             VALUES (?, ?, ?)
         """, map(lambda t: (lbltype,) + t, lbl_alphabet.iterate()))
 
+    cur.execute("COMMIT")
     db.commit()
     db.close()
