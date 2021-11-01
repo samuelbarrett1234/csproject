@@ -12,7 +12,7 @@ been tokenised in exactly the same way, or the tokeniser won't work.
 
 
 import os
-from compress import COMPRESSORS
+from transformers import BertTokenizer, TFBertForMaskedLM
 from compressors.base import Compressor
 from compressors.block import _batch
 import compressors.bnb_compression as bnb_compression
@@ -31,16 +31,25 @@ class BERT(Compressor):
         assert (init_state in INIT_STATE)
         assert (fine_tuning in FINE_TUNING)
         assert (comp in COMPRESSION)
+
         self.init_state = init_state
         self.fine_tuning = fine_tuning
         self.comp = comp
         self.repeat = train_repeat
+
         self._out_alphabet_sz = out_alphabet_sz
+        if self.init_state is not None:
+            # if we are starting from a pretrained model, we expect
+            # a specific input alphabet size:
+            self._in_alphabet_sz = BertTokenizer.from_pretrained(
+                self.init_state).vocab_size()
+        else:
+            self._in_alphabet_sz = None
+
         self._batch_size = batch_size
         self.mask_value = mask_value
         self.pad_value = pad_value
-        # TODO: validate input
-        # TODO: compute trained model filename
+
         self.model_fname = os.path.join(
             model_dir,
             (self.init_state + '-' or '') +
@@ -54,7 +63,8 @@ class BERT(Compressor):
         iter_train = self._make_masked_iter(iter_train)
         iter_val = self._make_masked_iter(iter_val)
 
-        # assert `alphabet_size` == expected input alphabet size??
+        assert(self._in_alphabet_sz is None or self._in_alphabet_sz == alphabet_size)
+        self._in_alphabet_sz = alphabet_size
 
         raise NotImplementedError()
         """
