@@ -13,6 +13,10 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 - Pick a script in the `load/` folder to create a new DB and load the data. See below for a discussion.
 - If the dataset requires unkification, `unkify.py` does this.
 - Once the data has been loaded, call `pair_up.py`, which creates pairings of the data points to train on (recall that the NCD method operates on pairs of inputs). This makes use of a _comma code_.
+**Warning:** by default, this script creates a new element in the alphabet to denote commas.
+However, if you are using a pretrained model, this will cause an error at training time.
+Instead in this case, you must pass the token which denotes the separator.
+For BERT's NLP tokenisation, this is the `[SEP]` token, so you would add `--use-comma "[SEP]"` to the command.
 - Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
 It applies the compressor to all of the data in the DB.
 Some compressors have to train first, like the BERT compressor.

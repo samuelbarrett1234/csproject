@@ -116,6 +116,9 @@ if __name__ == "__main__":
     parser.add_argument("policy", type=str,
                         help="The policy to use to construct the training dataset. "
                              "Must be one of: " + ", ".join(TRAIN_SET_POLICY.keys()))
+    parser.add_argument("--use-comma", type=str, default=None,
+                        help="If set, use the given token's ID for commas. Else "
+                             "generate a new character.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.db):
@@ -132,11 +135,22 @@ if __name__ == "__main__":
     cur = db.cursor()
     cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
-    # create a new comma character
-    cur.execute("SELECT MAX(tokid) + 1 FROM Alphabet")
-    comma_id = cur.fetchone()[0]
-    cur.execute("INSERT INTO Alphabet(tokid, tokval) VALUES (?, ?)",
-                (comma_id, '<COMMA>'))
+    if args.use_comma is None:
+        # create a new comma character
+        cur.execute("SELECT MAX(tokid) + 1 FROM Alphabet")
+        comma_id = cur.fetchone()[0]
+        cur.execute("INSERT INTO Alphabet(tokid, tokval) VALUES (?, ?)",
+                    (comma_id, '<COMMA>'))
+    else:
+        # lookup the given token
+        cur.execute("SELECT tokid FROM Alphabet WHERE tokval = ?",
+                    (args.use_comma,))
+        comma_id = cur.fetchone()
+        if comma_id is None:
+            print("Error: token '", args.use_comma, "' does not exist.")
+            exit(-1)
+        else:
+            comma_id = comma_id[0]
 
     add_sequences(
         db, comma_id,
