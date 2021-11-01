@@ -1,8 +1,7 @@
-import pytest
 import numpy as np
 from compressors.bnb_compression import (
     serialise_l2r, serialise_bnb, compress_serialisation,
-    _batched_merge_sort, serialise_cutting_sort
+    serialise_cutting_sort
 )
 
 
@@ -52,22 +51,6 @@ def test_bnb():
     assert(len(codes) == len(seqs))
     assert(len(codes[0]) == 3 * 8)
     assert(len(codes[1]) == 4 * 8)
-
-
-@pytest.mark.parametrize("N", [
-    64,
-    51,
-    1,
-    10
-])
-def test_batched_merge_sort(N):
-    seqs = np.random.randint(0, 100, size=(64, N))
-    original = np.copy(seqs)
-    cmp = lambda x, y: -np.sign(x - y)
-    _batched_merge_sort(seqs, cmp)
-    print(seqs)
-    for i in range(64):
-        assert(list(seqs[i]) == sorted(list(original[i])))
 
 
 def test_cutting_sort():
