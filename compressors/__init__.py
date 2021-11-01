@@ -2,3 +2,8 @@ from compressors.base import Compressor
 from compressors.chain import Chain
 from compressors.block import Block
 from compressors.huffman import Huffman
+from compressors.bert import BERT
+from compressors.bzip2 import BZ2
+from compressors.gzip import GZip
+from compressors.lzma import LZMA
+from compressors.zlib import ZLib
