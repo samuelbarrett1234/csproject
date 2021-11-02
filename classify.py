@@ -5,7 +5,6 @@ this script uses different classification methods to classify the labels.
 
 
 import os
-import itertools
 import argparse as ap
 import sqlite3 as sql
 import progressbar as pgb
@@ -18,16 +17,16 @@ def nearest_neighbour(db):
         SELECT seqid_left AS seqid_train, seqid_right AS seqid_other,
         lbltype, lbl, ncd_formula, ncd_value, compid
         FROM SequencePairings JOIN Sequences ON seqid_left = Sequences.seqid
-        WHERE Sequences.seqpart = 0
         JOIN NCDValues ON seqid_out = NCDValues.seqid
         JOIN Labels ON Sequences.seqid = Labels.seqid
+        WHERE Sequences.seqpart = 0
         UNION ALL
         SELECT seqid_right AS seqid_train, seqid_left AS seqid_other,
         lbltype, lbl, ncd_formula, ncd_value, compid
         FROM SequencePairings JOIN Sequences ON seqid_right = Sequences.seqid
-        WHERE Sequences.seqpart = 0
         JOIN NCDValues ON seqid_out = NCDValues.seqid
         JOIN Labels ON Sequences.seqid = Labels.seqid
+        WHERE Sequences.seqpart = 0
     ),
     Labellings AS (
         SELECT lbltype, ncd_formula, compid, seqid_other AS seqid, lbl, MIN(ncd_value)
@@ -37,6 +36,12 @@ def nearest_neighbour(db):
     SELECT DISTINCT lbltype, ncd_formula, compid, seqid, lbl FROM Labellings
     """)
     return cur.fetchall()
+
+
+def _my_chain(iter):
+    for iter2 in iter:
+        for item in iter2:
+            yield item
 
 
 CLASSIFICATION_METHODS = {
@@ -67,7 +72,7 @@ if __name__ == "__main__":
     INSERT INTO Predictions(predictor, lbltype, ncd_formula, compid, seqid, lbl)
     VALUES (?, ?, ?, ?, ?, ?)
     """,
-    pgb.progressbar(itertools.chain(map(apply, CLASSIFICATION_METHODS.items())))
+    pgb.progressbar(_my_chain(map(apply, CLASSIFICATION_METHODS.items())))
     )
 
     db.commit()
