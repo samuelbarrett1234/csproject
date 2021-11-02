@@ -28,10 +28,14 @@ if __name__ == "__main__":
     seqs = [encoded_input['input_ids'][0].astype(np.int32)]
 
     def _model(xs):
+        # tile extra parameters across the batch
+        types = np.repeat(encoded_input['token_type_ids'], xs.shape[0], axis=0)
+        att_mask = np.repeat(encoded_input['attention_mask'], xs.shape[0], axis=0)
+
         ps = tf.nn.softmax(model(
             input_ids=xs,
-            token_type_ids=encoded_input['token_type_ids'],
-            attention_mask=encoded_input['attention_mask']
+            token_type_ids=types,
+            attention_mask=att_mask
         ).logits, axis=-1).numpy()
         return ps
 
