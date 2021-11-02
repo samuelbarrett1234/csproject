@@ -6,7 +6,6 @@ of all of the model variations, and outputs them to a CSV.
 
 import os
 import csv
-import itertools
 import argparse as ap
 import sqlite3 as sql
 import progressbar as pgb
@@ -16,7 +15,7 @@ def compute_accuracy(db):
     cur = db.cursor()
     cur.execute("""
     WITH PredVsTrue AS (
-        SELECT lbltype, compid, predictor, ncd_formula, seqpart,
+        SELECT Predictions.lbltype, compid, predictor, ncd_formula, seqpart,
         CASE WHEN Predictions.lbl = Labels.lbl THEN 1.0 ELSE 0.0 END AS correct
         FROM Predictions NATURAL JOIN Sequences
         JOIN Labels ON Labels.seqid = Predictions.seqid AND Labels.lbltype = Predictions.lbltype
@@ -32,11 +31,12 @@ def compute_accuracy(db):
     Test AS (
         SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS test_acc
         FROM PredVsTrue WHERE seqpart = 2 GROUP BY lbltype, compid, predictor, ncd_formula
-    ),
-    SELECT lbltype, compname, comprepeat, compiteration, predictor, ncd_formula,
+    )
+    SELECT lbltype, compname, comprepeat, predictor, ncd_formula,
     train_acc, val_acc, test_acc
     FROM Train NATURAL JOIN Val NATURAL JOIN Test NATURAL JOIN Compressors
     """)
+    return cur.fetchall()
 
 
 METRICS = {
