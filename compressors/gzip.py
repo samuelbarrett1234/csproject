@@ -20,8 +20,8 @@ class GZip(Compressor):
 
 
     def compress(self, seq):
-        return list(map(int, gzip.compress(seq, compresslevel=self.compresslevel)))
+        return list(map(int, gzip.compress(bytes(seq), compresslevel=self.compresslevel)))
 
 
     def compressmany(self, seqs):
-        return super(self).compressmany(seqs)
+        return super(GZip, self).compressmany(seqs)

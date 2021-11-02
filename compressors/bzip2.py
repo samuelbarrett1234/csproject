@@ -20,8 +20,8 @@ class BZ2(Compressor):
 
 
     def compress(self, seq):
-        return list(map(int, bz2.compress(seq, compresslevel=self.compresslevel)))
+        return list(map(int, bz2.compress(bytes(seq), compresslevel=self.compresslevel)))
 
 
     def compressmany(self, seqs):
-        return super(self).compressmany(seqs)
+        return super(BZ2, self).compressmany(seqs)

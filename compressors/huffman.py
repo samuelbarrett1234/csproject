@@ -37,7 +37,10 @@ class Huffman(Compressor):
 
 
     def compress(self, seq):
-        return list(itertools.chain(map(lambda t: list(self.codebook[t]), seq)))
+        result = []
+        for t in seq:
+            result += self.codebook[t]
+        return result
 
 
     def compressmany(self, seqs):

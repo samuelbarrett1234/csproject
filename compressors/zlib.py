@@ -20,8 +20,8 @@ class ZLib(Compressor):
 
 
     def compress(self, seq):
-        return list(map(int, zlib.compress(seq, level=self.level)))
+        return list(map(int, zlib.compress(bytes(seq), level=self.level)))
 
 
     def compressmany(self, seqs):
-        return super(self).compressmany(seqs)
+        return super(ZLib, self).compressmany(seqs)

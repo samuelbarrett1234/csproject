@@ -16,8 +16,8 @@ class LZMA(Compressor):
 
 
     def compress(self, seq):
-        return list(map(int, lzma.compress(seq)))
+        return list(map(int, lzma.compress(bytes(seq))))
 
 
     def compressmany(self, seqs):
-        return super(self).compressmany(seqs)
+        return super(LZMA, self).compressmany(seqs)
