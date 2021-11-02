@@ -131,3 +131,29 @@ def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size):
         mask[i, cut_sorted_idxs] = True
 
     return _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value)
+
+
+
+def greedy_masking(model, seqs, pad_value, mask_value, alphabet_size):
+    """Mask the given list of sequences according to
+    the greedy masking algorithm. Returns the sequences
+    padded-batched into a matrix, with masking tokens inserted.
+    """    
+    seqs, init_keep = padded_batch(seqs, pad_value)
+
+    raise NotImplementedError()
+    idxs = cut_sort(model, seqs, mask_value)
+    mask = np.zeros_like(seqs, dtype=np.bool)  # array of Falses
+
+    # mask the sequences in the batch separately due to issues
+    # around differing sequence lengths
+    for i in range(seqs.shape[0]):
+        # only consider the indices which were not already kept
+        # by the initial keep set
+        cut_sorted_idxs = idxs[i, init_keep[i, idxs[i]] == 1]
+        # mask approximately the first half of these
+        cut_sorted_idxs = cut_sorted_idxs[:len(cut_sorted_idxs) // 2]
+        # now we have the indices to mask!
+        mask[i, cut_sorted_idxs] = True
+
+    return _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value)

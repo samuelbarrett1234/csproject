@@ -20,8 +20,8 @@ import masking
 
 
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
-FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort']
-COMPRESSION = ['L2R', 'cutting-sort']
+FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
+COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
 
 
 class BERT(Compressor):
@@ -95,9 +95,14 @@ class BERT(Compressor):
     def _compress_batch(self, seqs):
         if self.comp == 'L2R':
             seqs, mask_arrays = bnb_compression.serialise_l2r(
-                seqs, self.pad_value)
+                seqs, self.pad_value, keep_start_end=True)
         elif self.comp == 'cutting-sort':
             seqs, mask_arrays = bnb_compression.serialise_cutting_sort(
+                self.model, seqs, self.mask_value, self.pad_value,
+                keep_start_end=True
+            )
+        elif self.comp == 'greedy':
+            seqs, mask_arrays = bnb_compression.serialise_greedy(
                 self.model, seqs, self.mask_value, self.pad_value,
                 keep_start_end=True
             )

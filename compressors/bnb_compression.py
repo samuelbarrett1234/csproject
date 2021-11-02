@@ -11,11 +11,12 @@ into a sequence of codes.
 
 
 import numpy as np
-from bnb import padded_batch, solve_mask, cut_sort
+from bnb import padded_batch, solve_mask, cut_sort, greedy_order
 from compressors.huffman import _compute_codebook
 
 
-def serialise_l2r(seqs, pad_value):
+def serialise_l2r(seqs, pad_value,
+                  keep_start_end=False):
     """Serialise a list of sequences according to their left-to-right
     ordering.
 
@@ -24,13 +25,20 @@ def serialise_l2r(seqs, pad_value):
         pad_value (int): The integer representing padding, so that the
                          sequences can be padded to the same length and
                          put into a batch.
+        keep_start_end (boolean): If true, do not mask the first and last token
+                                  of any sequence.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
         model on, and the list of masking matrices. These parameters
         should be passed directly to `compress_serialisation`.
     """
+    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
     seqs, init_keep = padded_batch(seqs, pad_value)
+    if keep_start_end:
+        init_keep[:, 0] = 0
+        init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
+
     mask_arrays = np.zeros((seqs.shape[1] + 1, seqs.shape[0], seqs.shape[1]), dtype=np.int32)
     mask_arrays[0] = init_keep
     for i in range(1, mask_arrays.shape[0]):
@@ -142,11 +150,11 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
         model on, and the list of masking matrices. These parameters
         should be passed directly to `compress_serialisation`.
     """
+    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
     seqs, init_keep = padded_batch(seqs, pad_value)
-
     if keep_start_end:
         init_keep[:, 0] = 0
-        init_keep[:, -1] = 0
+        init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
 
     n_mask_arrays = seqs.shape[1] + 1
     if keep_start_end:
@@ -156,6 +164,60 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
     mask_arrays[-1, :, :] = 0  # final array must be all-zeroes
 
     idxs = cut_sort(model, seqs, mask_value)
+
+    for i in range(seqs.shape[0]):
+        # remove start/end/padding
+        # (need to do this separately for each element in the batch,
+        # since they may be of different lengths)
+        i_idxs = idxs[i, init_keep[i, idxs[i, :]] == 1]
+        for j in range(i_idxs.shape[0]):
+            mask_arrays[j, i, i_idxs[:j]] = 0
+
+    return seqs, mask_arrays
+
+
+def serialise_greedy(model, seqs, mask_value, pad_value,
+                     keep_start_end=False):
+    """Serialise a list of sequences according to the 'greedy order'.
+
+    Args:
+        model (callable): The model function, which takes as input a
+                          numpy array of shape (batch-size, seq-len)
+                          and outputs a probability distribution at
+                          each of those positions.
+        seqs (list of np.ndarray): A list of 1D integral vectors of
+                                   length equal to the batch size!!!
+        mask_value (int): The integer representing a masked token.
+        pad_value (int): The integer representing padding, so that the
+                         sequences can be padded to the same length and
+                         put into a batch.
+        ent_bud (float): The entropy budget - aka the minimum amount
+                         of entropy to be contained in each "new message".
+                         The smaller this is, the more messages you will
+                         send, and potentially the more compressive,
+                         however it will be slower.
+        keep_start_end (boolean): If true, do not mask the first and last token
+                                  of any sequence.
+
+    Returns:
+        A 2-tuple containing the padded batch of sequences to run the
+        model on, and the list of masking matrices. These parameters
+        should be passed directly to `compress_serialisation`.
+    """
+    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
+    seqs, init_keep = padded_batch(seqs, pad_value)
+    if keep_start_end:
+        init_keep[:, 0] = 0
+        init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
+
+    n_mask_arrays = seqs.shape[1] + 1
+    if keep_start_end:
+        n_mask_arrays -= 2
+
+    mask_arrays = np.repeat(init_keep[np.newaxis, :, :], n_mask_arrays, axis=0)
+    mask_arrays[-1, :, :] = 0  # final array must be all-zeroes
+
+    idxs = greedy_order(model, seqs, mask_value)
 
     for i in range(seqs.shape[0]):
         # remove start/end/padding

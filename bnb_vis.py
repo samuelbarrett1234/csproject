@@ -8,7 +8,7 @@ import argparse as ap
 import numpy as np
 import tensorflow as tf
 from transformers import BertTokenizer, TFBertForMaskedLM
-from compressors.bnb_compression import (serialise_bnb, compress_serialisation,
+from compressors.bnb_compression import (serialise_bnb, compress_serialisation, serialise_greedy,
                                          serialise_l2r, serialise_cutting_sort)
 
 
@@ -57,7 +57,18 @@ if __name__ == "__main__":
         print(tokenizer.convert_tokens_to_string(
             map(tokenizer._convert_id_to_token, seq)))
 
+    results = serialise_greedy(_model, seqs, mask_value, pad_value, keep_start_end=True)
+    greedy_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
+    printable_results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
+
+    print("GREEDY REVEAL ORDER")
+    for seq in printable_results[:, 0, :]:
+        print(tokenizer.convert_tokens_to_string(
+            map(tokenizer._convert_id_to_token, seq)))
+
     print("BNB Code:", "".join(map(str, bnb_codes[0])))
     print("Cutting Code:", "".join(map(str, cut_codes[0])))
+    print("Greedy Code:", "".join(map(str, greedy_codes[0])))
     print("Code lengths:")
-    print("BNB =", len(bnb_codes[0]), ", L2R =", len(l2r_codes[0]), "Cut =", len(cut_codes[0]))
+    print("BNB =", len(bnb_codes[0]), ", L2R =", len(l2r_codes[0]),
+          "Cut =", len(cut_codes[0]), "Greedy =", len(greedy_codes[0]))

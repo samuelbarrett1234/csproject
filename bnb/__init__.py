@@ -5,3 +5,4 @@ from bnb.buffered_frontier import BufferedNodeFrontier
 from bnb.frontier_batch import NodeFrontierBatch
 from bnb.solve import solve_mask, padded_batch
 from bnb.cut_sort import cut_sort
+from bnb.greedy import greedy_order

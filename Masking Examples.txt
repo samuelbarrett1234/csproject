@@ -40,3 +40,51 @@ BNB Code: 1000011111100011011010000110000011011001010010000101110010100100101100
 Cutting Code: 1110110011100010110101001001001101000011001100111110110101010011111001101011011111100000010001000011100110111001010100010001010100101101010011010000111
 Code lengths:
 BNB = 176 , L2R = 211 Cut = 151
+
+B&B REVEAL ORDER
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about kolmogo [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about kolmogorov complexity . [SEP]
+CUT REVEAL ORDER
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] [MASK]un [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun [MASK] [MASK] dissertation [MASK] [MASK] [MASK] [MASK] [MASK] about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] [MASK] [MASK] about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] [MASK] is about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] . [MASK] [MASK] is about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation supervisor . [MASK] [MASK] is about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . [MASK] [MASK] is about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my [MASK] is about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about [MASK]lm [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about [MASK]lmogo [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about [MASK]lmogorov [MASK] [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about kolmogorov complexity [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about kolmogorov complexity . [SEP]
+GREEDY REVEAL ORDER
+[CLS] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] [MASK] [MASK] is [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] [MASK]un is [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK]rov [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] [MASK] [MASK] [MASK] [MASK]lm [MASK]rov [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] dissertation [MASK] [MASK] [MASK]lm [MASK]rov [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] dissertation [MASK] [MASK] [MASK]lmogorov [MASK] [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] [MASK] [MASK] dissertation [MASK] [MASK] [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] . [MASK] dissertation [MASK] [MASK] [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is [MASK] dissertation [MASK] . [MASK] dissertation is [MASK] [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is [MASK] dissertation supervisor . [MASK] dissertation is [MASK] [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is [MASK] dissertation supervisor . [MASK] dissertation is about [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . [MASK] dissertation is about [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about [MASK]lmogorov complexity [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about kolmogorov complexity [MASK] [SEP]
+[CLS] varun is my dissertation supervisor . my dissertation is about kolmogorov complexity . [SEP]
+BNB Code: 100110110110101010011100101001101100100110101101111011000101011010010100011111001100101100010100001011000000100010101011010001001000011111011100010010001001101000011001110110111110010011110101101100110101110110001100000010
+Cutting Code: 100111111010100101010101001001000101011110101101111111001100010010111101101000110010011100110010111100100010100110011011110001011010100010101011
+Greedy Code: 0010111000001110000101111101111000001110011101111111101111000101010110100010101101110100111101101001101010011011000111001110000010111
+Code lengths:
+BNB = 222 , L2R = 222 Cut = 144 Greedy = 133
