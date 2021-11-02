@@ -12,7 +12,7 @@ into a sequence of codes.
 
 import numpy as np
 from bnb import padded_batch, solve_mask, cut_sort, greedy_order
-from compressors.huffman import _compute_codebook
+from compressors.coding import huffman_codebook
 
 
 def serialise_l2r(seqs, pad_value,
@@ -324,7 +324,7 @@ def _compute_joint_code(indep_dists, seq, d):
     # joint alphabet
     if indep_dists.shape[0] == 1:
         assert(seq.shape == (1,))
-        cbook = _compute_codebook(d, dict(enumerate(indep_dists[0])))
+        cbook = huffman_codebook(d, dict(enumerate(indep_dists[0])))
         return cbook[seq[0]]
     else:
         # we know the *length* of the Huffman code, K, is given
