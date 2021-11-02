@@ -26,8 +26,9 @@ class Huffman(Compressor):
         # is monotonic.
 
         tok_occ = dict([(i, 1) for i in range(alphabet_size)])  # token occurrences
-        for t in pgb.progressbar(itertools.chain(iter_train())):
-            tok_occ[t] += 1
+        for seq in pgb.progressbar(iter_train()):
+            for t in seq:
+                tok_occ[t] += 1
 
         # now compute the prefix-free codebook:
         self.codebook = huffman_codebook(self.d, tok_occ)
@@ -40,4 +41,4 @@ class Huffman(Compressor):
 
 
     def compressmany(self, seqs):
-        return super(self).compressmany(seqs)
+        return super(Huffman, self).compressmany(seqs)

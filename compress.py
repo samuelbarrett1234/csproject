@@ -18,7 +18,11 @@ import compressors as comp
 
 
 COMPRESSORS = {
-    'Huffman-2-ary-3-gram': comp.Chain([comp.Block(3), comp.Huffman(2)])
+    'Huffman-256': lambda: comp.Huffman(256),
+    'bzip2': lambda: comp.Chain([comp.Huffman(256), comp.BZ2()]),
+    'gzip': lambda: comp.Chain([comp.Huffman(256), comp.GZip()]),
+    'lzma': lambda: comp.Chain([comp.Huffman(256), comp.LZMA()]),
+    'zlib': lambda: comp.Chain([comp.Huffman(256), comp.ZLib()]),
 }
 
 
@@ -55,12 +59,16 @@ if __name__ == "__main__":
     compid = cur.fetchone()
     if compid is None:
         compid = 0
+    elif compid[0] is None:
+        compid = 0
     else:
         compid = compid[0]
     cur.execute("SELECT MAX(comprepeat) + 1 FROM Compressors WHERE compname = ?",
                 (args.compressor,))
     comprepeat = cur.fetchone()
     if comprepeat is None:
+        comprepeat = 0
+    elif comprepeat[0] is None:
         comprepeat = 0
     else:
         comprepeat = comprepeat[0]
@@ -72,19 +80,19 @@ if __name__ == "__main__":
         cur = db.cursor()
         for id in ids_iterator:
             cur.execute("SELECT tokid FROM SequenceValues WHERE seqid = ? "
-                        "ORDER BY svidx ASCENDING", (id,))
+                        "ORDER BY svidx ASC", (id,))
             yield list(map(lambda t: t[0], cur.fetchall()))
 
     def iterate_over_all():
         # it is very important that the ordering of the returned IDs
         # is not arbitrary
         cur = db.cursor()
-        cur.execute("SELECT seqid FROM Sequences ORDER BY seqid ASCENDING")
+        cur.execute("SELECT seqid FROM Sequences ORDER BY seqid ASC")
         return map(lambda t: t[0], cur.fetchall())
 
     def iterate_over_part(part, shuffle):
         cur = db.cursor()
-        s = ("ORDER BY RANDOM()" if shuffle else "ORDER BY seqid ASCENDING")
+        s = ("ORDER BY RANDOM()" if shuffle else "ORDER BY seqid ASC")
         cur.execute("SELECT seqid FROM Sequences WHERE seqpart = ? " + s, (part,))
         return map(lambda t: t[0], cur.fetchall())
 
@@ -118,7 +126,7 @@ if __name__ == "__main__":
         "INSERT INTO CompressionSizes(compid, seqid, compsz) VALUES (?, ?, ?)",
         pgb.progressbar(
             map(
-                lambda data, seqid: (compid, seqid, len(data)),
+                lambda data_seqid: (compid, data_seqid[1], len(data_seqid[0])),
                 zip(comp.compressmany(iter_all()), iterate_over_all())
             )
         ))
