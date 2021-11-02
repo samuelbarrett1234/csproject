@@ -11,7 +11,7 @@ import sqlite3 as sql
 import progressbar as pgb
 
 
-def add_sequences(db, comma_id, iter):
+def add_sequences(db, comma_id, iter, squash_start_end):
     cur = db.cursor()
     cur.execute("SELECT MAX(seqid) + 1 FROM Sequences")
     next_seq_id = cur.fetchone()[0]
@@ -21,26 +21,61 @@ def add_sequences(db, comma_id, iter):
             INSERT INTO Sequences(seqid, seqpart, seq_is_pair)
             VALUES (?, ?, 1)
         """, (next_seq_id, seqpart_out))
-        # copy leftmost sequence
+
+        # mark it as paired
         cur.execute("""
-            INSERT INTO SequenceValues(seqid, svidx, tokid)
-            SELECT ?, svidx, tokid FROM SequenceValues WHERE seqid = ?
-        """, (next_seq_id, seq_left))
+            INSERT INTO SequencePairings(seqid_left, seqid_right, seqid_out)
+            VALUES (?, ?, ?)
+        """, (seq_left, seq_right, next_seq_id))
+
         # get leftmost sequence length
         cur.execute("""
             SELECT MAX(svidx) + 1 FROM SequenceValues WHERE seqid = ?
         """, (seq_left,))
         seq_left_sz = cur.fetchone()[0]
-        # insert comma
-        cur.execute("""
-            INSERT INTO SequenceValues(seqid, svidx, tokid)
-            VALUES (?, ?, ?)
-        """, (next_seq_id, seq_left_sz, comma_id))
-        # copy rightmost sequence
-        cur.execute("""
-            INSERT INTO SequenceValues(seqid, svidx, tokid)
-            SELECT ?, svidx + ?, tokid FROM SequenceValues WHERE seqid = ?
-        """, (next_seq_id, seq_left_sz + 1, seq_right))
+
+        if squash_start_end:
+            # copy leftmost sequence
+            # don't copy end token
+            cur.execute("""
+                INSERT INTO SequenceValues(seqid, svidx, tokid)
+                SELECT ?, svidx, tokid FROM SequenceValues
+                WHERE seqid = ? AND svidx + 1 < ?
+            """, (next_seq_id, seq_left, seq_left_sz))
+
+            # insert comma
+            cur.execute("""
+                INSERT INTO SequenceValues(seqid, svidx, tokid)
+                VALUES (?, ?, ?)
+            """, (next_seq_id, seq_left_sz - 1, comma_id))
+
+            # copy rightmost sequence
+            # don't copy first token
+            cur.execute("""
+                INSERT INTO SequenceValues(seqid, svidx, tokid)
+                SELECT ?, svidx + ? - 1, tokid FROM SequenceValues
+                WHERE seqid = ? AND svidx > 0
+            """, (next_seq_id, seq_left_sz, seq_right))
+        else:
+            # copy leftmost sequence
+            cur.execute("""
+                INSERT INTO SequenceValues(seqid, svidx, tokid)
+                SELECT ?, svidx, tokid FROM SequenceValues
+                WHERE seqid = ?
+            """, (next_seq_id, seq_left))
+
+            # insert comma
+            cur.execute("""
+                INSERT INTO SequenceValues(seqid, svidx, tokid)
+                VALUES (?, ?, ?)
+            """, (next_seq_id, seq_left_sz, comma_id))
+
+            # copy rightmost sequence
+            cur.execute("""
+                INSERT INTO SequenceValues(seqid, svidx, tokid)
+                SELECT ?, svidx + ?, tokid FROM SequenceValues WHERE seqid = ?
+            """, (next_seq_id, seq_left_sz + 1, seq_right))
+
         # advance output sequence ID
         next_seq_id += 1
 
@@ -56,21 +91,16 @@ def get_evaluation_sequences(db):  # get all nontrain sequences paired with a tr
     # make sure to select ORDERED PAIRS of such sequences
     # (hence the "UNION ALL".)
     cur.execute("""
-        SELECT A.seqid, B.seqid, A.seqpart
-        FROM Sequences AS A JOIN Sequences AS B
-        ON A.seqpart != B.seqpart
-        WHERE A.seqpart != 0 AND A.seq_is_pair = 0
-        AND B.seq_is_pair = 0
-
-        UNION ALL
-
         SELECT A.seqid, B.seqid, B.seqpart
         FROM Sequences AS A JOIN Sequences AS B
         ON A.seqpart != B.seqpart
-        WHERE B.seqpart != 0 AND A.seq_is_pair = 0
+        WHERE A.seqpart == 0 AND A.seq_is_pair = 0
         AND B.seq_is_pair = 0
     """)
-    return cur.fetchall()
+    for A_seqid, B_seqid, B_seqpart in cur.fetchall():
+        # yield both ways round
+        yield (A_seqid, B_seqid, B_seqpart)
+        yield (B_seqid, A_seqid, B_seqpart)
 
 
 def get_all_train_sequences(db):  # get all train sequences paired with all other train sequences
@@ -119,6 +149,12 @@ if __name__ == "__main__":
     parser.add_argument("--use-comma", type=str, default=None,
                         help="If set, use the given token's ID for commas. Else "
                              "generate a new character.")
+    parser.add_argument("--squash-start-end", action='store_true',
+                        help="Set this if your sequences have special start/end "
+                             "symbols and you want the output, paired sentences "
+                             "to *only* retain these at the start of the "
+                             "first sentence and the end of the last sentence. "
+                             "Tldr: set this for BERT models.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.db):
@@ -160,7 +196,8 @@ if __name__ == "__main__":
                 get_evaluation_sequences(db),
                 TRAIN_SET_POLICY[args.policy](db)
             )
-        )
+        ),
+        args.squash_start_end
     )
 
     db.commit()

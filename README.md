@@ -18,6 +18,7 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 However, if you are using a pretrained model, this will cause an error at training time.
 Instead in this case, you must pass the token which denotes the separator.
 For BERT's NLP tokenisation, this is the `[SEP]` token, so you would add `--use-comma "[SEP]"` to the command.
+You must also use `--squash-start-end` for NLP BERT-tokenised data.
 - Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
 It applies the compressor to all of the data in the DB.
 Some compressors have to train first, like the BERT compressor.
