@@ -17,19 +17,44 @@ import progressbar as pgb
 import compressors as comp
 
 
+# compressors accept two arguments in the constructor:
+# the data directory, to save any model information (only
+# used by deep learning models), and `rep`, the repeat index,
+# used for constructing distinct filenames for model data
+# corresponding to different runs
 COMPRESSORS = {
-    'Huffman-256': lambda: comp.Huffman(256),
-    'bzip2': lambda: comp.Chain([comp.Huffman(256), comp.BZ2()]),
-    'gzip': lambda: comp.Chain([comp.Huffman(256), comp.GZip()]),
-    'lzma': lambda: comp.Chain([comp.Huffman(256), comp.LZMA()]),
-    'zlib': lambda: comp.Chain([comp.Huffman(256), comp.ZLib()]),
+    'bzip2': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.BZ2()]),
+    'gzip': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.GZip()]),
+    'lzma': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.LZMA()]),
+    'zlib': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
+    'BERT-base-uncased-L2R': lambda data_dir, rep: comp.BERT(
+        data_dir, init_state='bert-base-uncased', fine_tuning=None,
+        comp='L2R', train_repeat=rep),
+    'BERT-base-uncased-cutting-sort': lambda data_dir, rep: comp.BERT(
+        data_dir, init_state='bert-base-uncased', fine_tuning=None,
+        comp='cutting-sort', train_repeat=rep),
+    'BERT-base-uncased-greedy': lambda data_dir, rep: comp.BERT(
+        data_dir, init_state='bert-base-uncased', fine_tuning=None,
+        comp='greedy', train_repeat=rep),
+    'BERT-large-uncased-L2R': lambda data_dir, rep: comp.BERT(
+        data_dir, init_state='bert-large-uncased', fine_tuning=None,
+        comp='L2R', train_repeat=rep),
+    'BERT-large-uncased-cutting-sort': lambda data_dir, rep: comp.BERT(
+        data_dir, init_state='bert-large-uncased', fine_tuning=None,
+        comp='cutting-sort', train_repeat=rep),
+    'BERT-large-uncased-greedy': lambda data_dir, rep: comp.BERT(
+        data_dir, init_state='bert-large-uncased', fine_tuning=None,
+        comp='greedy', train_repeat=rep),
 }
+# TODO: construct BERT-like compressors algorithmically
 
 
 if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("db", type=str,
                         help="Filename of the DB to load.")
+    parser.add_argument("model_data_dir", type=str,
+                        help="Directory to place model data.")
     parser.add_argument("compressor", type=str,
                         help="The name of the compressor to run. Must "
                              "be one of: " + ", ".join(COMPRESSORS.keys()))
@@ -37,6 +62,10 @@ if __name__ == "__main__":
 
     if not os.path.isfile(args.db):
         print("Error: cannot find ", args.db)
+        exit(-1)
+
+    if not os.path.isdir(args.model_data_dir):
+        print("Error:", args.model_data_dir, "is not a directory.")
         exit(-1)
 
     if args.compressor not in COMPRESSORS:
@@ -109,7 +138,7 @@ if __name__ == "__main__":
 
     print("Creating/training compressor...")
 
-    comp = COMPRESSORS[args.compressor]()
+    comp = COMPRESSORS[args.compressor](args.model_data_dir, comprepeat)
     compd = comp.train(alphabet_size, iter_train, iter_val)
 
     # SAVE THE COMPRESSOR'S METADATA
