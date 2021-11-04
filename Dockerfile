@@ -6,7 +6,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN echo "APT INSTALLS" \
 	&& apt-get update \
-    && apt-get -qq -y install git curl unzip sqlite3 wget libopencv-dev
+    && apt-get -qq -y install git curl unzip sqlite3 wget
 
 # see https://pythonspeed.com/articles/activate-conda-dockerfile/
 RUN echo "CONDA ENV SETUP" \
