@@ -16,15 +16,28 @@ import numpy as np
 import tensorflow as tf
 from transformers import BertTokenizer, TFBertForMaskedLM
 from compressors.base import Compressor
-from compressors.block import _batch
 import compressors.bnb_compression as bnb_compression
 import masking
 
 
-BATCH_SIZE = 32
+BATCH_SIZE = 128
+MAX_LENGTH = 64
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
+
+
+def _chop(s):
+    # chop a sequence (list of ints) into sublists
+    # satisfying MAX_LENGTH
+    buf = []
+    for t in s:
+        buf.append(t)
+        if len(buf) == MAX_LENGTH:
+            yield buf
+            buf = []
+    if len(buf) > 0:
+        yield buf
 
 
 class BERT(Compressor):
@@ -35,6 +48,11 @@ class BERT(Compressor):
         assert (init_state in INIT_STATE)
         assert (fine_tuning in FINE_TUNING)
         assert (comp in COMPRESSION)
+
+        if tf.test.gpu_device_name(): 
+            print('Default GPU Device:{}'.format(tf.test.gpu_device_name()))
+        else:
+            print("WARNING: no GPU found!")
 
         # the defaults for `mask_value` and `pad_value` are
         # only valid for BERT pretrained tokeniser
@@ -106,30 +124,76 @@ class BERT(Compressor):
 
 
     def compress(self, seq):
-        self.compressmany([seq] * BATCH_SIZE)[0]
+        return self.compressmany([seq])[0]
 
 
     def compressmany(self, seqs):
-        for batch_codes in map(self._compress_batch,
-                               _batch(seqs, BATCH_SIZE)):
-            for code in batch_codes:
-                yield code
+        chopped_seqs = map(list, map(_chop, seqs))
+
+        csbuf = []  # chopped sequence buffer
+        cslenq = []  # FIFO queue containing integers, corresponding to number of elements to read from `csbuf`
+        codebuf = []  # buffer containing the resulting codes
+        for cs in chopped_seqs:
+            csbuf += cs
+            cslenq.append(len(cs))
+
+            # while we can run the model on new data
+            while len(csbuf) >= BATCH_SIZE:
+                # compress available data
+                codebuf += self._compress_batch(csbuf[:BATCH_SIZE])
+                # reduce buffer
+                csbuf = csbuf[BATCH_SIZE:]
+
+            # while we can extract data from the output of the model
+            while len(cslenq) > 0 and len(codebuf) >= cslenq[0]:
+                # concatenate the first `cslenq[0]` codes:
+                result_code = [c for code in codebuf[:cslenq[0]] for c in code]
+                yield result_code
+                codebuf = codebuf[cslenq[0]:]
+                cslenq = cslenq[1:]
+
+        # there may still be data left over to yield
+        if len(cslenq) > 0:
+            assert(len(csbuf) > 0)
+            # arbitrarily extend `csbuf` to fit the batch size
+            csbuf += [csbuf[0]] * (BATCH_SIZE - len(csbuf))
+            # compress it
+            codebuf += self._compress_batch(csbuf)
+            # empty it (not actually necessary)
+            csbuf = []
+
+            # yield all of the remaining results
+            while len(cslenq) > 0:
+                assert(len(codebuf) >= cslenq[0])
+                # concatenate the first `cslenq[0]` codes:
+                result_code = [c for code in codebuf[:cslenq[0]] for c in code]
+                yield result_code
+                codebuf = codebuf[cslenq[0]:]
+                cslenq = cslenq[1:]
 
 
     def _compress_batch(self, seqs):
         seqs = list([np.array(xs, dtype=np.int32) for xs in seqs])
+
+        # check dimensions of input
+        assert(len(seqs) == BATCH_SIZE)
+        largest_seq = max(map(len, seqs))
+        assert(largest_seq <= MAX_LENGTH)
+
         if self.comp == 'L2R':
             seqs, mask_arrays = bnb_compression.serialise_l2r(
-                seqs, self.pad_value, keep_start_end=True)
+                seqs, self.pad_value, keep_start_end=True,
+                min_length=MAX_LENGTH
+            )
         elif self.comp == 'cutting-sort':
             seqs, mask_arrays = bnb_compression.serialise_cutting_sort(
                 self._call_model, seqs, self.mask_value, self.pad_value,
-                keep_start_end=True
+                keep_start_end=True, min_length=MAX_LENGTH
             )
         elif self.comp == 'greedy':
             seqs, mask_arrays = bnb_compression.serialise_greedy(
                 self._call_model, seqs, self.mask_value, self.pad_value,
-                keep_start_end=True
+                keep_start_end=True, min_length=MAX_LENGTH
             )
         codes = bnb_compression.compress_serialisation(
             self._call_model, seqs, mask_arrays, self.mask_value,
