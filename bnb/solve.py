@@ -4,6 +4,7 @@ as a single function.
 """
 
 
+from compressors.bnb_compression import serialise_bnb
 import numpy as np
 from bnb.node import Node
 from bnb.stoppable_node import StoppableNode
@@ -88,7 +89,7 @@ def solve_mask(model, entropy_budget, seqs, init_keeps, mask_value,
     return nfs.solutions()
 
 
-def padded_batch(seqs, pad_token):
+def padded_batch(seqs, pad_token, min_length=None):
     """Take a collection of sequences of possibly different lengths, and
     put them together in a matrix, with padding at the ends. In the
     meantime, also produce an initial `Keep` state, to pass to `solve_mask`,
@@ -101,6 +102,10 @@ def padded_batch(seqs, pad_token):
                          ideally not be able to see these. We do not want
                          it to think it can use these as information about
                          the sequence itself!)
+        min_length (int, optional): If not None, force the output sequences to
+                                    be at least this long, by adding padding.
+                                    If provided, cannot be shorter than any
+                                    sequence.
     """
     assert(not np.any(seqs == pad_token))
     N = max(map(len, seqs))
@@ -110,6 +115,14 @@ def padded_batch(seqs, pad_token):
             pad_token * np.ones((N - len(s)), dtype=s.dtype)
             )) for s in seqs]
     )
+    if min_length is not None:
+        assert(min_length >= seqs.shape[1])
+        seqs = np.concatenate(
+            (seqs,
+            pad_token *
+            np.ones((seqs.shape[0],
+                    min_length - seqs.shape[1]),
+                    dtype=np.int32)), axis=1)
     init_keep = np.where(
         seqs == pad_token,
         0, 1
