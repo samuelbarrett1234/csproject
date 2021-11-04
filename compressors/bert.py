@@ -40,11 +40,43 @@ def _chop(s):
         yield buf
 
 
+def _reverse_mask_arrays(mask_arrays):
+    # swap order
+    rev = np.copy(mask_arrays)[::-1, :, :]
+    # swap mask and keep
+    rev = 1 - rev
+    # but: initial states needs to be preserved
+    rev = np.where(mask_arrays[:1, :, :] == 0, 0, rev)
+    # some checks:
+    assert(np.all(rev[0, :, :] == mask_arrays[0, :, :]))
+    assert(np.all(rev[1:] - rev[:-1] <= 0))
+    assert(np.all(rev[-1, :, :] == 0))
+    return rev
+
+
 class BERT(Compressor):
     def __init__(self, model_dir,
                  init_state, fine_tuning, comp,
                  mask_value=None, pad_value=None,
-                 train_repeat=0, out_alphabet_sz=2):
+                 train_repeat=0, out_alphabet_sz=2,
+                 reverse_order=False):
+        """Create a BERT compressor model.
+
+        Args:
+            model_dir (str): The directory to find/put any trained models.
+            init_state (str, optional): Must be from `INIT_STATE`.
+            fine_tuning (str, optional): Must be from `FINE_TUNING`.
+            comp (str): Must be from `COMPRESSION`.
+            mask_value (int, optional): The token representing masking. If left None,
+                                        `init_state` must not be None, and the pretrained
+                                        BERT's value will be inferred.
+            pad_value (int, optional): The token representing padding. If left None,
+                                       `init_state` must not be None, and the pretrained
+                                       BERT's value will be inferred.
+            train_repeat (int, optional): The index of the repeat of this training experiment.
+            out_alphabet_sz (int, optional): The output alphabet size. Defaults to 2.
+            reverse_order (bool, optional): If true, reverse the order of the compression method.
+        """
         assert (init_state in INIT_STATE)
         assert (fine_tuning in FINE_TUNING)
         assert (comp in COMPRESSION)
@@ -62,6 +94,7 @@ class BERT(Compressor):
         self.init_state = init_state
         self.fine_tuning = fine_tuning
         self.comp = comp
+        self.reverse = reverse_order
         self.repeat = train_repeat
         self._model_obj = None  # loaded in `train`
 
@@ -195,6 +228,8 @@ class BERT(Compressor):
                 self._call_model, seqs, self.mask_value, self.pad_value,
                 keep_start_end=True, min_length=MAX_LENGTH
             )
+        if self.reverse:
+            mask_arrays = _reverse_mask_arrays(mask_arrays)
         codes = bnb_compression.compress_serialisation(
             self._call_model, seqs, mask_arrays, self.mask_value,
             self._out_alphabet_sz

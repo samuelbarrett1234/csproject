@@ -10,6 +10,7 @@ NOTE: might want auxiliary data like the chosen BERT masking procedure
 
 
 import os
+import itertools
 import datetime
 import argparse as ap
 import sqlite3 as sql
@@ -27,26 +28,21 @@ COMPRESSORS = {
     'gzip': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.GZip()]),
     'lzma': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.LZMA()]),
     'zlib': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
-    'BERT-base-uncased-L2R': lambda data_dir, rep: comp.BERT(
-        data_dir, init_state='bert-base-uncased', fine_tuning=None,
-        comp='L2R', train_repeat=rep),
-    'BERT-base-uncased-cutting-sort': lambda data_dir, rep: comp.BERT(
-        data_dir, init_state='bert-base-uncased', fine_tuning=None,
-        comp='cutting-sort', train_repeat=rep),
-    'BERT-base-uncased-greedy': lambda data_dir, rep: comp.BERT(
-        data_dir, init_state='bert-base-uncased', fine_tuning=None,
-        comp='greedy', train_repeat=rep),
-    'BERT-large-uncased-L2R': lambda data_dir, rep: comp.BERT(
-        data_dir, init_state='bert-large-uncased', fine_tuning=None,
-        comp='L2R', train_repeat=rep),
-    'BERT-large-uncased-cutting-sort': lambda data_dir, rep: comp.BERT(
-        data_dir, init_state='bert-large-uncased', fine_tuning=None,
-        comp='cutting-sort', train_repeat=rep),
-    'BERT-large-uncased-greedy': lambda data_dir, rep: comp.BERT(
-        data_dir, init_state='bert-large-uncased', fine_tuning=None,
-        comp='greedy', train_repeat=rep),
 }
-# TODO: construct BERT-like compressors algorithmically
+# construct BERT compressors algorithmically
+BERT_INIT_STATES = ['bert-base-uncased', 'bert-large-uncased']
+BERT_COMPS = ['L2R', 'cutting-sort', 'greedy']
+BERT_REVERSES = [False, True]
+for init_state, comp_type, reverse in itertools.product(BERT_INIT_STATES, BERT_COMPS, BERT_REVERSES):
+    name = 'BERT-' + init_state + '-' + comp_type
+    if reverse:
+        name += '-reversed'
+    # warning:
+    # https://stackoverflow.com/questions/2295290/what-do-lambda-function-closures-capture
+    COMPRESSORS[name] = lambda data_dir, rep, init_state=init_state, fine_tuning=None, comp_type=comp_type, reverse=reverse: comp.BERT(
+        data_dir, init_state=init_state, fine_tuning=fine_tuning,
+        comp=comp_type, train_repeat=rep, reverse_order=reverse
+    )
 
 
 if __name__ == "__main__":
