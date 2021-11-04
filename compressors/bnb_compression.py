@@ -10,14 +10,14 @@ into a sequence of codes.
 """
 
 
-import time
 import numpy as np
 from bnb import padded_batch, solve_mask, cut_sort, greedy_order
 from compressors.coding import huffman_codebook
 
 
 def serialise_l2r(seqs, pad_value,
-                  keep_start_end=False):
+                  keep_start_end=False,
+                  min_length=None):
     """Serialise a list of sequences according to their left-to-right
     ordering.
 
@@ -28,6 +28,10 @@ def serialise_l2r(seqs, pad_value,
                          put into a batch.
         keep_start_end (boolean): If true, do not mask the first and last token
                                   of any sequence.
+        min_length (int, optional): If not None, force the output sequences to
+                                    be at least this long, by adding padding.
+                                    If provided, cannot be shorter than any
+                                    sequence.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -35,7 +39,7 @@ def serialise_l2r(seqs, pad_value,
         should be passed directly to `compress_serialisation`.
     """
     seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
-    seqs, init_keep = padded_batch(seqs, pad_value)
+    seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
     if keep_start_end:
         init_keep[:, 0] = 0
         init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
@@ -51,7 +55,7 @@ def serialise_l2r(seqs, pad_value,
 
 
 def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
-                  keep_start_end=False):
+                  keep_start_end=False, min_length=None):
     """Serialise a list of sequences according to the output of solving
     the branch-and-bound procedure.
 
@@ -73,6 +77,10 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
                          however it will be slower.
         keep_start_end (boolean): If true, do not mask the first and last token
                                   of any sequence.
+        min_length (int, optional): If not None, force the output sequences to
+                                    be at least this long, by adding padding.
+                                    If provided, cannot be shorter than any
+                                    sequence.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -82,7 +90,7 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
     lens = list(map(len, seqs))
     # pad the sequences, which simultaneously gives us
     # the initial `keep` state:
-    seqs, keep = padded_batch(seqs, pad_value)
+    seqs, keep = padded_batch(seqs, pad_value, min_length=min_length)
 
     # special start/end tokens must be kept if the caller indicates:
     if keep_start_end:
@@ -124,7 +132,7 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
 
 
 def serialise_cutting_sort(model, seqs, mask_value, pad_value,
-                           keep_start_end=False):
+                           keep_start_end=False, min_length=None):
     """Serialise a list of sequences according to the 'cutting sort order'.
 
     Args:
@@ -145,6 +153,10 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
                          however it will be slower.
         keep_start_end (boolean): If true, do not mask the first and last token
                                   of any sequence.
+        min_length (int, optional): If not None, force the output sequences to
+                                    be at least this long, by adding padding.
+                                    If provided, cannot be shorter than any
+                                    sequence.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -152,7 +164,7 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
         should be passed directly to `compress_serialisation`.
     """
     seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
-    seqs, init_keep = padded_batch(seqs, pad_value)
+    seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
     if keep_start_end:
         init_keep[:, 0] = 0
         init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
@@ -178,7 +190,7 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
 
 
 def serialise_greedy(model, seqs, mask_value, pad_value,
-                     keep_start_end=False):
+                     keep_start_end=False, min_length=None):
     """Serialise a list of sequences according to the 'greedy order'.
 
     Args:
@@ -199,6 +211,10 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
                          however it will be slower.
         keep_start_end (boolean): If true, do not mask the first and last token
                                   of any sequence.
+        min_length (int, optional): If not None, force the output sequences to
+                                    be at least this long, by adding padding.
+                                    If provided, cannot be shorter than any
+                                    sequence.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -206,7 +222,7 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
         should be passed directly to `compress_serialisation`.
     """
     seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
-    seqs, init_keep = padded_batch(seqs, pad_value)
+    seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
     if keep_start_end:
         init_keep[:, 0] = 0
         init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0

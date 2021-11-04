@@ -4,7 +4,6 @@ as a single function.
 """
 
 
-from compressors.bnb_compression import serialise_bnb
 import numpy as np
 from bnb.node import Node
 from bnb.stoppable_node import StoppableNode
