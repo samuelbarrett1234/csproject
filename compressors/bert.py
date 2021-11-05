@@ -14,20 +14,20 @@ been tokenised in exactly the same way, or the tokeniser won't work.
 import os
 import numpy as np
 import tensorflow as tf
+
+# don't eat all GPU memory
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+
 from transformers import BertTokenizer, TFBertForMaskedLM
 from compressors.base import Compressor
 import compressors.bnb_compression as bnb_compression
 import masking
 
 
-# don't eat all GPU memory
-gpus = tf.config.experimental.list_physical_devices('GPU')
-for gpu in gpus:
-  tf.config.experimental.set_memory_growth(gpu, True)
-
-
 BATCH_SIZE = 128
-MAX_LENGTH = 64
+MAX_LENGTH = 32
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
