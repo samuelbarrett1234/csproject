@@ -185,6 +185,10 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
         i_idxs = idxs[i, init_keep[i, idxs[i, :]] == 1]
         for j in range(i_idxs.shape[0]):
             mask_arrays[j, i, i_idxs[:j]] = 0
+        # any leftover padding
+        # (aka accounting for any discrepancy between `n_mask_arrays`
+        # and len(i_idxs))
+        mask_arrays[i_idxs.shape[0]:, i, :] = 0
 
     return seqs, mask_arrays
 
@@ -282,16 +286,16 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
     last_masks = None
     for masks in mask_arrays:
         if last_seqs is not None:
-            # run the model to get its current belief over masked
-            # sequences:
-            ps = model(last_seqs)
-
             # compute which new tokens are being revealed at this
             # timestep (possibly none):
             new = last_masks - masks
             assert(np.all(new >= 0))
             # (note that the number of revealed tokens may be different
             # for different sequences)
+
+            # run the model to get its current belief over masked
+            # sequences:
+            ps = model(last_seqs)
 
             # now, for each sequence, compute the Huffman code of the
             # joint distribution of the revealed tokens, and add it
