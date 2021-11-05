@@ -20,6 +20,12 @@ import compressors.bnb_compression as bnb_compression
 import masking
 
 
+# don't eat all GPU memory
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+  tf.config.experimental.set_memory_growth(gpu, True)
+
+
 BATCH_SIZE = 128
 MAX_LENGTH = 64
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
