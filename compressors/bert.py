@@ -26,7 +26,7 @@ import compressors.bnb_compression as bnb_compression
 import masking
 
 
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 MAX_LENGTH = 32
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
