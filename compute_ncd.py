@@ -26,9 +26,12 @@ NCD_FORMULAE = {
 }
 
 
-def apply_ncd(comp_data, ncd_formula_data):
+def apply_ncd(data):
+    # unpacking
+    comp_data, ncd_formula_data = data
     xy, x, y, seqid, compid = comp_data
     ncd_formula, ncd_function = ncd_formula_data
+
     return seqid, compid, ncd_formula, ncd_function(xy, x, y)
 
 
