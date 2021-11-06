@@ -247,6 +247,10 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
         i_idxs = idxs[i, init_keep[i, idxs[i, :]] == 1]
         for j in range(i_idxs.shape[0]):
             mask_arrays[j, i, i_idxs[:j]] = 0
+        # any leftover padding
+        # (aka accounting for any discrepancy between `n_mask_arrays`
+        # and len(i_idxs))
+        mask_arrays[i_idxs.shape[0]:, i, :] = 0
 
     return seqs, mask_arrays
 
