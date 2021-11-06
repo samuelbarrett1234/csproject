@@ -75,7 +75,7 @@ if __name__ == "__main__":
         with open(out_fname, "w") as f:
             writer = csv.writer(f)
             writer.writerow(('Label_Type', 'Compression_Algorithm',
-                             'Compression_Repeat', 'Compression_Iteration',
+                             'Compression_Repeat',
                              'Predictor', 'NCD_Formula',
                              'TrainScore', 'ValScore', 'TestScore'))
             writer.writerows(pgb.progressbar(func(db)))
