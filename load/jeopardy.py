@@ -44,6 +44,14 @@ def labels(row):
     }
 
 
+def preprocess_question(s):
+    # many if not all questions are enquoted
+    if s[0] == "'" and s[-1] == "'":
+        return s[1:-1]
+    else:
+        return s
+
+
 if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("db", type=str,
@@ -113,7 +121,7 @@ if __name__ == "__main__":
                 """, (seqid, lbl_type_ids.at(lbl_type), lbl_types[lbl_type].at(lbl)))
 
             # compute and save the sequence values:
-            for i, s in enumerate(tokenizer(row['question'])['input_ids']):
+            for i, s in enumerate(tokenizer(preprocess_question(row['question']))['input_ids']):
                 cur.execute("""
                     INSERT INTO SequenceValues(seqid, svidx, tokid)
                     VALUES (?, ?, ?)
