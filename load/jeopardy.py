@@ -96,13 +96,14 @@ if __name__ == "__main__":
             js = js[:min(args.limit, len(js))]
 
         # 80/10/10 data split
-        data_split = [int(0.8 * len(js)), int(0.05 * len(js))]
+        data_split = [int(0.9 * len(js)), int(0.05 * len(js))]
         data_split[1] += data_split[0]
-        data_split.append(len(js) - data_split[1])
+        data_split.append(len(js))
 
         for i, row in pgb.progressbar(enumerate(js)):
             # compute which partition this sequence falls into
             split = bisect.bisect_left(data_split, i)
+            assert(split < len(data_split))
 
             # save an entry for the sequence itself:
             cur.execute("""
