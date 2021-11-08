@@ -31,6 +31,10 @@ MAX_LENGTH = 32
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
+EXPERT_GENERATORS = {
+    'last-10': lambda iter, mask: masking.LastNMaskGeneratorExpert(10, iter, mask, BATCH_SIZE)
+}
+N_FINE_TUNE_EPOCHS = 2
 
 
 def _chop(s):
@@ -152,12 +156,7 @@ class BERT(Compressor):
             raise NotImplementedError()
 
         if self.fine_tuning is not None:
-            # apply masking and batching to the iterators
-            iter_train = self._make_masked_iter(iter_train)
-            iter_val = self._make_masked_iter(iter_val)
-
-            # TODO: train according to the given masking method!
-            raise NotImplementedError()
+            self._fine_tune(iter_train, iter_val)
 
         return self._out_alphabet_sz
 
@@ -243,14 +242,63 @@ class BERT(Compressor):
         return codes
 
 
-    def _make_masked_iter(self, iter):
-        # this is nontrivial because:
-        # (i) masking is expensive, should cache or only run every few epochs, IDEALLY IN PARALLEL!
-        # (ii) the model on which we base the masking procedure is nontrivial, it is an expert model,
-        # and there are many possible ways of getting an expert model:
-        #   a. the last epoch's model
-        #   b. the best model so far, according to validation set NLL
-        #   c. maxentnash mixture of models
-        # (iii) if we set a max sequence length (and we probably should), in addition to batching
-        # we should also split sequences to fit inside this, and just compress them independently.
-        raise NotImplementedError()
+    def _fine_tune(self, iter_train, iter_val):
+        assert(self.fine_tuning is not None)
+
+        # we need to chop the sequences before they
+        # are passed to the expert generator:
+        def _create_chopped_iter(iter):
+            def f():
+                for s in iter():
+                    for t in _chop(s):
+                        yield t
+            return f
+
+        iter_train = _create_chopped_iter(iter_train)
+        iter_val = _create_chopped_iter(iter_val)
+
+        # create expert generators for each iterator
+        # here we pass our masking function (parameterised by an arbitrary
+        # model) which allows the expert generators to perform masking and
+        # cache it
+        iter_train = EXPERT_GENERATORS['last-10'](iter_train, self._fine_tune_mask_seqs)
+        iter_val = EXPERT_GENERATORS['last-10'](iter_val, self._fine_tune_mask_seqs)
+
+        for epoch in range(N_FINE_TUNE_EPOCHS):
+            print("Starting epoch", epoch)
+            # TODO: iterate over the train set to train
+            # does this require a call to `fit`? The loss function
+            # is nontrivial (i.e. not fixed).
+            iter_train.update(self._model_obj)
+            iter_val.update(self._model_obj)
+
+
+    def _fine_tune_mask_seqs(self, model, seqs):
+        """Turn a list of sequences (not yet batched, but equal to
+        the batch size and satisfying length requirements) into a
+        2-tuple, where the first element is the masked sequence
+        batch (as a 2D array), and the second element is a boolean
+        masking matrix indicating which elements you should apply
+        loss to. (Note that there may be tokens which are not
+        equal to the mask value but for which you must apply the
+        loss function at.)
+
+        Note how this function does not assume you want to use
+        `self._model` as the model for generating these masks.
+        """
+        if self.fine_tuning == 'bert':
+            return masking.bert_masking(
+                seqs, self.pad_value, self.mask_value,
+                self._in_alphabet_sz, min_length=MAX_LENGTH)
+        elif self.fine_tuning == 'span-bert':
+            return masking.span_bert_masking(
+                seqs, self.pad_value, self.mask_value,
+                self._in_alphabet_sz, min_length=MAX_LENGTH)
+        elif self.fine_tuning == 'cutting-sort':
+            return masking.cut_sort_masking(
+                model, seqs, self.pad_value, self.mask_value,
+                self._in_alphabet_sz, min_length=MAX_LENGTH)
+        elif self.fine_tuning == 'greedy':
+            return masking.greedy_masking(
+                model, seqs, self.pad_value, self.mask_value,
+                self._in_alphabet_sz, min_length=MAX_LENGTH)
