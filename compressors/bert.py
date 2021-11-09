@@ -34,7 +34,7 @@ COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
 EXPERT_GENERATORS = {
     'last-10': lambda iter, mask: masking.LastNMaskGeneratorExpert(10, iter, mask, BATCH_SIZE)
 }
-N_FINE_TUNE_EPOCHS = 2
+N_FINE_TUNE_EPOCHS = 4
 
 
 def _chop(s):

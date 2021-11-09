@@ -67,8 +67,11 @@ class MaskGeneratorExpert:
                     yield results
                     pickle.dump(results, self.cache)
                     buffer = []
-            # personally I'm happy with dropping the last batch
-            # if it is not the right shape
+            # yield any leftover data
+            if len(buffer) > 0:
+                results = self.mask(self._call_model, buffer)
+                yield results
+                pickle.dump(results, self.cache)
 
 
     def update(self, newmodel):
