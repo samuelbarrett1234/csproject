@@ -2,6 +2,6 @@ progressbar2
 numpy
 pytest
 nltk
--c huggingface transformers
+-c huggingface transformers==4.10.2
 -c anaconda tensorflow-gpu==2.3
 cython
