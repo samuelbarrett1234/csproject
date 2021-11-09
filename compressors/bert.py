@@ -20,7 +20,7 @@ gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-from transformers import BertTokenizer, TFBertForMaskedLM
+from transformers import BertTokenizer, TFBertForMaskedLM, BertConfig
 from compressors.base import Compressor
 import compressors.bnb_compression as bnb_compression
 import masking
@@ -143,20 +143,24 @@ class BERT(Compressor):
         assert(self._in_alphabet_sz is None or self._in_alphabet_sz == alphabet_size)
         self._in_alphabet_sz = alphabet_size
 
-        # TODO: check if *trained* model exists at `self.model_fname`
-        # and if so, load it and DO NOT CONTINUE
-
-        if self.init_state is not None:
-            self._model_obj = TFBertForMaskedLM.from_pretrained(self.init_state)
+        if os.path.exists(self.model_fname):
+            self._model_obj = tf.keras.models.load_model(self.model_fname)
         else:
-            # TODO: construct untrained model!
-            # is it as simple as TFBertForMaskedLM()?
-            # (the key is that the input alphabet size, and values for special
-            # parameters, may be different.)
-            raise NotImplementedError()
+            if self.init_state is not None:
+                self._model_obj = TFBertForMaskedLM.from_pretrained(self.init_state)
+            else:
+                self._model_obj = TFBertForMaskedLM(
+                    config=BertConfig(
+                        vocab_size=self._in_alphabet_sz))
 
-        if self.fine_tuning is not None:
-            self._fine_tune(iter_train, iter_val)
+            if self.fine_tuning is not None:
+                optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5)
+                self._model_obj.compile(
+                    optimizer=optimizer,
+                    loss=self._model_obj.compute_loss)
+                self._fine_tune(iter_train, iter_val)
+
+            self._model_obj.save(self.model_fname)
 
         return self._out_alphabet_sz
 
@@ -255,22 +259,30 @@ class BERT(Compressor):
             return f
 
         iter_train = _create_chopped_iter(iter_train)
-        iter_val = _create_chopped_iter(iter_val)
+        # iter_val = _create_chopped_iter(iter_val)
 
         # create expert generators for each iterator
         # here we pass our masking function (parameterised by an arbitrary
         # model) which allows the expert generators to perform masking and
         # cache it
         iter_train = EXPERT_GENERATORS['last-10'](iter_train, self._fine_tune_mask_seqs)
-        iter_val = EXPERT_GENERATORS['last-10'](iter_val, self._fine_tune_mask_seqs)
+        # iter_val = EXPERT_GENERATORS['last-10'](iter_val, self._fine_tune_mask_seqs)
+
+        def _prepare_batch(data):
+            seqs, masked_seqs, mask = data
+            return {
+                'input_ids': masked_seqs,
+                'labels': np.where(mask, seqs, -100)
+            }
 
         for epoch in range(N_FINE_TUNE_EPOCHS):
             print("Starting epoch", epoch)
-            # TODO: iterate over the train set to train
-            # does this require a call to `fit`? The loss function
-            # is nontrivial (i.e. not fixed).
             iter_train.update(self._model_obj)
             iter_val.update(self._model_obj)
+            self._model_obj.fit(
+                map(_prepare_batch, iter_train()),
+                epochs=1
+            )
 
 
     def _fine_tune_mask_seqs(self, model, seqs):

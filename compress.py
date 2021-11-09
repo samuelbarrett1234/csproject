@@ -30,11 +30,11 @@ COMPRESSORS = {
     'zlib': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
 }
 # construct BERT compressors algorithmically
-BERT_INIT_STATES = ['bert-base-uncased', 'bert-large-uncased']
+BERT_INIT_STATES = [None, 'bert-base-uncased', 'bert-large-uncased']
 BERT_COMPS = ['L2R', 'cutting-sort', 'greedy']
 BERT_REVERSES = [False, True]
 for init_state, comp_type, reverse in itertools.product(BERT_INIT_STATES, BERT_COMPS, BERT_REVERSES):
-    name = 'BERT-' + init_state + '-' + comp_type
+    name = 'BERT-' + (init_state or 'untrained') + '-' + comp_type
     if reverse:
         name += '-reversed'
     # warning:
