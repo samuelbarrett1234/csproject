@@ -255,8 +255,11 @@ class BERT(Compressor):
             def f():
                 for s in iter():
                     for t in _chop(s):
-                        yield t
+                        yield np.array(t, dtype=np.int32)
             return f
+
+        # NOTE: I've commented out `iter_val` stuff because
+        # I'm not using validation sets at the moment.
 
         iter_train = _create_chopped_iter(iter_train)
         # iter_val = _create_chopped_iter(iter_val)
@@ -270,15 +273,15 @@ class BERT(Compressor):
 
         def _prepare_batch(data):
             seqs, masked_seqs, mask = data
-            return {
-                'input_ids': masked_seqs,
-                'labels': np.where(mask, seqs, -100)
-            }
+            # return (input, labels) tuples
+            # (-100 denotes places where we should not use loss,
+            # i.e. places where `mask` is false.)
+            return (masked_seqs, np.where(mask, seqs, -100))
 
         for epoch in range(N_FINE_TUNE_EPOCHS):
             print("Starting epoch", epoch)
             iter_train.update(self._model_obj)
-            iter_val.update(self._model_obj)
+            # iter_val.update(self._model_obj)
             self._model_obj.fit(
                 map(_prepare_batch, iter_train()),
                 epochs=1

@@ -75,7 +75,7 @@ if __name__ == "__main__":
         print("Allowed values are:", ", ".join(COMPRESSORS.keys()))
         exit(-1)
 
-    db = sql.connect(args.db)
+    db = sql.connect(args.db, check_same_thread=False)
     cur = db.cursor()
     cur.execute("PRAGMA FOREIGN_KEYS = ON")
 

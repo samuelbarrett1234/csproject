@@ -23,6 +23,8 @@ This is to allow experts to be generated before any iterating begins.
 
 import pickle
 import tempfile
+import numpy as np
+import tensorflow as tf
 
 
 class MaskGeneratorExpert:
@@ -54,7 +56,7 @@ class MaskGeneratorExpert:
                     break
         else:
             # if cache does not exist, create it as a temporary file
-            self.cache = tempfile.TemporaryFile(model='wb+')
+            self.cache = tempfile.TemporaryFile(mode='wb+')
             buffer = []
             for seq in self.iter():
                 # collect the sequences into a buffer
@@ -77,7 +79,7 @@ class MaskGeneratorExpert:
         raise NotImplementedError()
 
 
-class LastNMaskGeneratorExpert:
+class LastNMaskGeneratorExpert(MaskGeneratorExpert):
     """Group the epochs together into groups of size N, and use
     a uniform weighting across the *previous* group to generate
     the masks for all models in the next group. Larger N means more
@@ -102,3 +104,10 @@ class LastNMaskGeneratorExpert:
                 self.cur_experts = self.upcoming_experts
                 self.upcoming_experts = []
                 self.cache = None
+
+
+    def _call_model(self, xs):
+        ps = np.stack([
+            tf.nn.softmax(expert(xs).logits, axis=-1).numpy()
+            for expert in self.cur_experts])
+        return np.mean(ps, axis=0)
