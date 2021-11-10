@@ -36,11 +36,93 @@ def compute_accuracy(db):
     train_acc, val_acc, test_acc
     FROM Train NATURAL JOIN Val NATURAL JOIN Test NATURAL JOIN Compressors
     """)
-    return cur.fetchall()
+    return (
+        ('Label_Type', 'Compression_Algorithm',
+         'Compression_Repeat',
+         'Predictor', 'NCD_Formula',
+         'TrainScore', 'ValScore', 'TestScore'),
+        cur.fetchall()
+    )
+
+
+def compute_compression_sizes(db):
+    cur = db.cursor()
+    cur.execute("""
+    WITH Train AS (
+        SELECT compid, AVG(compsz) AS train_sz
+        FROM CompressionSizes NATURAL JOIN Sequences
+        WHERE seqpart = 0
+        GROUP BY compid
+    ),
+    Val AS (
+        SELECT compid, AVG(compsz) AS val_sz
+        FROM CompressionSizes NATURAL JOIN Sequences
+        WHERE seqpart = 1
+        GROUP BY compid
+    ),
+    Test AS (
+        SELECT compid, AVG(compsz) AS test_sz
+        FROM CompressionSizes NATURAL JOIN Sequences
+        WHERE seqpart = 2
+        GROUP BY compid
+    ),
+    InputDimension AS (
+        SELECT COUNT(*) AS n FROM Alphabet
+    )
+    SELECT compname, comprepeat, compd, n, train_sz, val_sz, test_sz
+    FROM Compressors NATURAL JOIN Train NATURAL JOIN Val NATURAL JOIN Test
+    NATURAL JOIN InputDimension
+    """)
+    return (
+        ('Compression_Algorithm', 'Compression_Repeat', 'Out_Dim',
+         'In_Dim', 'Train', 'Val', 'Test'),
+        cur.fetchall()
+    )
+
+
+def compute_compression_ratios(db):
+    cur = db.cursor()
+    cur.execute("""
+    WITH SequenceLengths AS (
+        SELECT seqid, MAX(svidx) + 1 AS slen FROM SequenceValues
+        GROUP BY seqid
+    ),
+    InputDimension AS (
+        SELECT COUNT(*) AS n FROM Alphabet
+    ),
+    Train AS (
+        SELECT compid, AVG(compsz / slen) AS train_rt
+        FROM CompressionSizes NATURAL JOIN SequenceLengths
+        NATURAL JOIN Sequences WHERE seqpart = 0
+        GROUP BY compid
+    ),
+    Val AS (
+        SELECT compid, AVG(compsz / slen) AS val_rt
+        FROM CompressionSizes NATURAL JOIN SequenceLengths
+        NATURAL JOIN Sequences WHERE seqpart = 0
+        GROUP BY compid
+    ),
+    Test AS (
+        SELECT compid, AVG(compsz / slen) AS test_rt
+        FROM CompressionSizes NATURAL JOIN SequenceLengths
+        NATURAL JOIN Sequences WHERE seqpart = 0
+        GROUP BY compid
+    )
+    SELECT compname, comprepeat, compd, n, train_rt, val_rt, test_rt
+    FROM Compressors NATURAL JOIN Train NATURAL JOIN Val NATURAL JOIN Test
+    NATURAL JOIN InputDimension
+    """)
+    return (
+        ('Compression_Algorithm', 'Compression_Repeat', 'Out_Dim',
+         'In_Dim', 'Train', 'Val', 'Test'),
+        cur.fetchall()
+    )
 
 
 METRICS = {
-    'accuracy': compute_accuracy
+    'accuracy': compute_accuracy,
+    'sizes': compute_compression_sizes,
+    'ratios': compute_compression_ratios
 }
 
 
@@ -74,10 +156,8 @@ if __name__ == "__main__":
 
         with open(out_fname, "w") as f:
             writer = csv.writer(f)
-            writer.writerow(('Label_Type', 'Compression_Algorithm',
-                             'Compression_Repeat',
-                             'Predictor', 'NCD_Formula',
-                             'TrainScore', 'ValScore', 'TestScore'))
-            writer.writerows(pgb.progressbar(func(db)))
+            headers, data = func(db)
+            writer.writerow(headers)
+            writer.writerows(pgb.progressbar(data))
 
     db.close()
