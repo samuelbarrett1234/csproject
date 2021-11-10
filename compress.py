@@ -38,9 +38,10 @@ for init_state, comp_type, fine_tuning, reverse in itertools.product(BERT_INIT_S
                                                                      BERT_COMPS,
                                                                      BERT_FINE_TUNING,
                                                                      BERT_REVERSES):
-    name = 'BERT-' + (init_state or 'untrained') + '-' + comp_type
+    name = 'BERT-' + (init_state or 'untrained')
     if fine_tuning is not None:
         name += '-' + fine_tuning
+    name += '-' + comp_type
     if reverse:
         name += '-reversed'
     # warning:
