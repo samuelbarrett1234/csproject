@@ -47,7 +47,8 @@ for init_state, comp_type, fine_tuning, reverse in itertools.product(BERT_INIT_S
     # https://stackoverflow.com/questions/2295290/what-do-lambda-function-closures-capture
     COMPRESSORS[name] = lambda data_dir, rep, init_state=init_state, fine_tuning=fine_tuning, comp_type=comp_type, reverse=reverse: comp.BERT(
         data_dir, init_state=init_state, fine_tuning=fine_tuning,
-        comp=comp_type, train_repeat=rep, reverse_order=reverse
+        comp=comp_type, train_repeat=rep, reverse_order=reverse,
+        out_alphabet_sz=256  # byte
     )
 
 
