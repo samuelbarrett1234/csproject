@@ -32,7 +32,7 @@ COMPRESSORS = {
 # construct BERT compressors algorithmically
 BERT_INIT_STATES = [None, 'bert-base-uncased', 'bert-large-uncased']
 BERT_COMPS = ['L2R', 'cutting-sort', 'greedy']
-BERT_FINE_TUNING = [None, 'cutting-sort', 'greedy']
+BERT_FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 BERT_REVERSES = [False, True]
 for init_state, comp_type, fine_tuning, reverse in itertools.product(BERT_INIT_STATES,
                                                                      BERT_COMPS,
