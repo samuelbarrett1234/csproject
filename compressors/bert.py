@@ -26,28 +26,32 @@ import compressors.bnb_compression as bnb_compression
 import masking
 
 
-BATCH_SIZE = 128
-MAX_LENGTH = 32
+BATCH_SIZE_TRAIN, BATCH_SIZE_COMP = 32, 128
+MAX_LENGTH_TRAIN, MAX_LENGTH_COMP = 128, 32
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
 EXPERT_GENERATORS = {
-    'last-10': lambda iter, mask: masking.LastNMaskGeneratorExpert(10, iter, mask, BATCH_SIZE)
+    'last-10': lambda iter, mask: masking.LastNMaskGeneratorExpert(10, iter, mask, BATCH_SIZE_TRAIN)
 }
 N_FINE_TUNE_EPOCHS = 4
 
 
-def _chop(s):
+def _chop(s, max_len):
     # chop a sequence (list of ints) into sublists
-    # satisfying MAX_LENGTH
+    # satisfying max_len
+    # however we must be careful to preserve the start
+    # and end tokens, as they are special!
+    assert(max_len > 2)
+    assert(len(s) > 2)
     buf = []
-    for t in s:
+    for t in s[1:-1]:
         buf.append(t)
-        if len(buf) == MAX_LENGTH:
-            yield buf
+        if len(buf) == max_len - 2:
+            yield [s[0]] + buf + [s[-1]]
             buf = []
     if len(buf) > 0:
-        yield buf
+        yield [s[0]] + buf + [s[-1]]
 
 
 def _reverse_mask_arrays(mask_arrays):
@@ -144,7 +148,7 @@ class BERT(Compressor):
         self._in_alphabet_sz = alphabet_size
 
         if os.path.exists(self.model_fname):
-            self._model_obj = tf.keras.models.load_model(self.model_fname)
+            self._model_obj = TFBertForMaskedLM.from_pretrained(self.model_fname)
         else:
             if self.init_state is not None:
                 self._model_obj = TFBertForMaskedLM.from_pretrained(self.init_state)
@@ -160,7 +164,7 @@ class BERT(Compressor):
                     loss=self._model_obj.compute_loss)
                 self._fine_tune(iter_train, iter_val)
 
-            self._model_obj.save(self.model_fname)
+            self._model_obj.save_pretrained(self.model_fname)
 
         return self._out_alphabet_sz
 
@@ -170,7 +174,9 @@ class BERT(Compressor):
 
 
     def compressmany(self, seqs):
-        chopped_seqs = map(list, map(_chop, seqs))
+        chopped_seqs = map(list, map(
+            lambda s: _chop(s, MAX_LENGTH_COMP),
+            seqs))
 
         csbuf = []  # chopped sequence buffer
         cslenq = []  # FIFO queue containing integers, corresponding to number of elements to read from `csbuf`
@@ -180,11 +186,11 @@ class BERT(Compressor):
             cslenq.append(len(cs))
 
             # while we can run the model on new data
-            while len(csbuf) >= BATCH_SIZE:
+            while len(csbuf) >= BATCH_SIZE_COMP:
                 # compress available data
-                codebuf += self._compress_batch(csbuf[:BATCH_SIZE])
+                codebuf += self._compress_batch(csbuf[:BATCH_SIZE_COMP])
                 # reduce buffer
-                csbuf = csbuf[BATCH_SIZE:]
+                csbuf = csbuf[BATCH_SIZE_COMP:]
 
             # while we can extract data from the output of the model
             while len(cslenq) > 0 and len(codebuf) >= cslenq[0]:
@@ -198,7 +204,7 @@ class BERT(Compressor):
         if len(cslenq) > 0:
             assert(len(csbuf) > 0)
             # arbitrarily extend `csbuf` to fit the batch size
-            csbuf += [csbuf[0]] * (BATCH_SIZE - len(csbuf))
+            csbuf += [csbuf[0]] * (BATCH_SIZE_COMP - len(csbuf))
             # compress it
             codebuf += self._compress_batch(csbuf)
             # empty it (not actually necessary)
@@ -218,24 +224,24 @@ class BERT(Compressor):
         seqs = list([np.array(xs, dtype=np.int32) for xs in seqs])
 
         # check dimensions of input
-        assert(len(seqs) == BATCH_SIZE)
+        assert(len(seqs) == BATCH_SIZE_COMP)
         largest_seq = max(map(len, seqs))
-        assert(largest_seq <= MAX_LENGTH)
+        assert(largest_seq <= MAX_LENGTH_COMP)
 
         if self.comp == 'L2R':
             seqs, mask_arrays = bnb_compression.serialise_l2r(
                 seqs, self.pad_value, keep_start_end=True,
-                min_length=MAX_LENGTH
+                min_length=MAX_LENGTH_COMP
             )
         elif self.comp == 'cutting-sort':
             seqs, mask_arrays = bnb_compression.serialise_cutting_sort(
                 self._call_model, seqs, self.mask_value, self.pad_value,
-                keep_start_end=True, min_length=MAX_LENGTH
+                keep_start_end=True, min_length=MAX_LENGTH_COMP
             )
         elif self.comp == 'greedy':
             seqs, mask_arrays = bnb_compression.serialise_greedy(
                 self._call_model, seqs, self.mask_value, self.pad_value,
-                keep_start_end=True, min_length=MAX_LENGTH
+                keep_start_end=True, min_length=MAX_LENGTH_COMP
             )
         if self.reverse:
             mask_arrays = _reverse_mask_arrays(mask_arrays)
@@ -254,7 +260,7 @@ class BERT(Compressor):
         def _create_chopped_iter(iter):
             def f():
                 for s in iter():
-                    for t in _chop(s):
+                    for t in _chop(s, MAX_LENGTH_TRAIN):
                         yield np.array(t, dtype=np.int32)
             return f
 
@@ -304,16 +310,16 @@ class BERT(Compressor):
         if self.fine_tuning == 'bert':
             return masking.bert_masking(
                 seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH)
+                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
         elif self.fine_tuning == 'span-bert':
             return masking.span_bert_masking(
                 seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH)
+                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
         elif self.fine_tuning == 'cutting-sort':
             return masking.cut_sort_masking(
                 model, seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH)
+                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
         elif self.fine_tuning == 'greedy':
             return masking.greedy_masking(
                 model, seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH)
+                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
