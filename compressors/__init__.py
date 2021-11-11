@@ -4,6 +4,6 @@ from compressors.block import Block
 from compressors.huffman import Huffman
 from compressors.bert import BERT
 from compressors.bzip2 import BZ2
-from compressors.gzip import GZip
-from compressors.lzma import LZMA
-from compressors.zlib import ZLib
+from compressors.gzipc import GZip
+from compressors.lzmac import LZMA
+from compressors.zlibc import ZLib
