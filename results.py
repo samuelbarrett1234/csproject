@@ -32,9 +32,9 @@ def compute_accuracy(db):
         SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS test_acc
         FROM PredVsTrue WHERE seqpart = 2 GROUP BY lbltype, compid, predictor, ncd_formula
     )
-    SELECT lbltype, compname, comprepeat, predictor, ncd_formula,
+    SELECT lbltype_name, compname, comprepeat, predictor, ncd_formula,
     train_acc, val_acc, test_acc
-    FROM Train NATURAL JOIN Val NATURAL JOIN Test NATURAL JOIN Compressors
+    FROM Train NATURAL JOIN Val NATURAL JOIN Test NATURAL JOIN Compressors NATURAL JOIN LabelTypes
     """)
     return (
         ('Label_Type', 'Compression_Algorithm',
