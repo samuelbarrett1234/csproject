@@ -35,6 +35,7 @@ EXPERT_GENERATORS = {
     'last-10': lambda iter, mask: masking.LastNMaskGeneratorExpert(10, iter, mask, BATCH_SIZE_TRAIN)
 }
 N_FINE_TUNE_EPOCHS = 4
+LEARNING_RATE = 1.0e-3
 
 
 def _chop(s, max_len):
@@ -158,7 +159,7 @@ class BERT(Compressor):
                         vocab_size=self._in_alphabet_sz))
 
             if self.fine_tuning is not None:
-                optimizer = tf.keras.optimizers.Adam(learning_rate=5e-5)
+                optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
                 self._model_obj.compile(
                     optimizer=optimizer,
                     loss=self._model_obj.compute_loss)
