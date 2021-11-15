@@ -31,6 +31,11 @@ class Alphabet:
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 
+def sentence_length(q):
+    # bucket the actual lengths into groups of 5, stopping at 30(=6*5)
+    return min(len(q) // 5, 6)
+
+
 def labels(row):
     dt = row['air_date'].split('-')
     return {
@@ -40,7 +45,9 @@ def labels(row):
         'show_number': row['show_number'],
         'year': str(dt[0]),
         'month': str(dt[0]) + '-' + str(dt[1]),
-        'day': row['air_date']
+        'day': row['air_date'],
+        'slen': sentence_length(row['question']),
+        'negation': (1 if 'not' in row['question'] else 0)
     }
 
 
