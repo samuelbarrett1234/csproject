@@ -63,3 +63,11 @@ class Compressor(abc.ABC):
             As discussed above, the output alphabet size may be different.
         """
         return map(self.compress, seqs)
+
+
+    def fine_tuning_method(self):
+        return None
+
+
+    def comp_method(self):
+        return None

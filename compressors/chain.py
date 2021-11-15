@@ -125,3 +125,22 @@ class Chain(Compressor):
         for c in self.compressors:
             seqs = c.compressmany(seqs)
         return seqs
+
+
+    def fine_tuning_method(self):
+        # return first non-None return result from the children
+        methods = [c.fine_tuning_method() for c in self.compressors]
+        methods = [m for m in methods if m is not None]
+        if len(methods) == 0:
+            return None
+        else:
+            return methods[0]
+
+    def comp_method(self):
+        # return first non-None return result from the children
+        methods = [c.comp_method() for c in self.compressors]
+        methods = [m for m in methods if m is not None]
+        if len(methods) == 0:
+            return None
+        else:
+            return methods[0]

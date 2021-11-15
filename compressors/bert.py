@@ -324,3 +324,11 @@ class BERT(Compressor):
             return masking.greedy_masking(
                 model, seqs, self.pad_value, self.mask_value,
                 self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
+
+
+    def fine_tuning_method(self):
+        return self.fine_tuning
+
+
+    def comp_method(self):
+        return self.comp

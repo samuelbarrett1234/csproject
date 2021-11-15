@@ -80,6 +80,8 @@ CREATE TABLE Compressors(
     comprepeat INTEGER NOT NULL DEFAULT 0,
     compdate TEXT NOT NULL,  -- date time of script invocation for creating this compressor
     compd INTEGER NOT NULL,  -- the size of the compressor's output alphabet
+    comp_fine_tuning TEXT NULL,  -- the fine-tuning method, if applicable
+    comp_method TEXT NULL, -- the compression "submethod", if applicable
     UNIQUE(compname, comprepeat)
 );
 
