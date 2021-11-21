@@ -28,6 +28,7 @@ import masking
 
 BATCH_SIZE_TRAIN, BATCH_SIZE_COMP = 32, 128
 MAX_LENGTH_TRAIN, MAX_LENGTH_COMP = 128, 32
+COMP_BLOCKING = 16
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
@@ -232,20 +233,25 @@ class BERT(Compressor):
         if self.comp == 'L2R':
             seqs, mask_arrays = bnb_compression.serialise_l2r(
                 seqs, self.pad_value, keep_start_end=True,
-                min_length=MAX_LENGTH_COMP
+                min_length=MAX_LENGTH_COMP,
+                blocking=COMP_BLOCKING
             )
         elif self.comp == 'cutting-sort':
             seqs, mask_arrays = bnb_compression.serialise_cutting_sort(
                 self._call_model, seqs, self.mask_value, self.pad_value,
-                keep_start_end=True, min_length=MAX_LENGTH_COMP
+                keep_start_end=True, min_length=MAX_LENGTH_COMP,
+                blocking=COMP_BLOCKING
             )
         elif self.comp == 'greedy':
             seqs, mask_arrays = bnb_compression.serialise_greedy(
                 self._call_model, seqs, self.mask_value, self.pad_value,
-                keep_start_end=True, min_length=MAX_LENGTH_COMP
+                keep_start_end=True, min_length=MAX_LENGTH_COMP,
+                blocking=COMP_BLOCKING
             )
+
         if self.reverse:
             mask_arrays = _reverse_mask_arrays(mask_arrays)
+
         codes = bnb_compression.compress_serialisation(
             self._call_model, seqs, mask_arrays, self.mask_value,
             self._out_alphabet_sz

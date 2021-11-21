@@ -15,9 +15,24 @@ from bnb import padded_batch, solve_mask, cut_sort, greedy_order
 from compressors.coding import huffman_codebook
 
 
+def _block_mask_arrays(mask_arrays, blocking):
+    if blocking == 1 or blocking is None:
+        return mask_arrays
+
+    # select masking arrays in steps of size `blocking`
+    rng = list(range(0, mask_arrays.shape[0], blocking))
+    # but it is crucial that we sample the first and the last:
+    if rng[0] != 0:
+        rng = [0] + rng
+    if rng[-1] != mask_arrays.shape[0] - 1:
+        rng = rng + [mask_arrays.shape[0] - 1]
+    return mask_arrays[rng]
+
+
 def serialise_l2r(seqs, pad_value,
                   keep_start_end=False,
-                  min_length=None):
+                  min_length=None,
+                  blocking=None):
     """Serialise a list of sequences according to their left-to-right
     ordering.
 
@@ -32,6 +47,11 @@ def serialise_l2r(seqs, pad_value,
                                     be at least this long, by adding padding.
                                     If provided, cannot be shorter than any
                                     sequence.
+        blocking (int, optional): If not None, mask tokens in groups of this
+                                  size. This will make for a slightly worse
+                                  compressor, but the speedup will be on the
+                                  order of the blocking size. Passing None
+                                  here is equivalent to passing 1.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -51,7 +71,7 @@ def serialise_l2r(seqs, pad_value,
         # but reveal token i-1
         mask_arrays[i] = mask_arrays[i - 1]
         mask_arrays[i, :, i - 1] = 0
-    return seqs, mask_arrays
+    return seqs, _block_mask_arrays(mask_arrays, blocking)
 
 
 def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
@@ -132,7 +152,8 @@ def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
 
 
 def serialise_cutting_sort(model, seqs, mask_value, pad_value,
-                           keep_start_end=False, min_length=None):
+                           keep_start_end=False, min_length=None,
+                           blocking=None):
     """Serialise a list of sequences according to the 'cutting sort order'.
 
     Args:
@@ -157,6 +178,11 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
                                     be at least this long, by adding padding.
                                     If provided, cannot be shorter than any
                                     sequence.
+        blocking (int, optional): If not None, mask tokens in groups of this
+                                  size. This will make for a slightly worse
+                                  compressor, but the speedup will be on the
+                                  order of the blocking size. Passing None
+                                  here is equivalent to passing 1.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -176,7 +202,7 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
     mask_arrays = np.repeat(init_keep[np.newaxis, :, :], n_mask_arrays, axis=0)
     mask_arrays[-1, :, :] = 0  # final array must be all-zeroes
 
-    idxs = cut_sort(model, seqs, mask_value)
+    idxs = cut_sort(model, seqs, mask_value, blocking=blocking)
 
     for i in range(seqs.shape[0]):
         # remove start/end/padding
@@ -190,11 +216,12 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
         # and len(i_idxs))
         mask_arrays[i_idxs.shape[0]:, i, :] = 0
 
-    return seqs, mask_arrays
+    return seqs, _block_mask_arrays(mask_arrays, blocking)
 
 
 def serialise_greedy(model, seqs, mask_value, pad_value,
-                     keep_start_end=False, min_length=None):
+                     keep_start_end=False, min_length=None,
+                     blocking=None):
     """Serialise a list of sequences according to the 'greedy order'.
 
     Args:
@@ -219,6 +246,11 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
                                     be at least this long, by adding padding.
                                     If provided, cannot be shorter than any
                                     sequence.
+        blocking (int, optional): If not None, mask tokens in groups of this
+                                  size. This will make for a slightly worse
+                                  compressor, but the speedup will be on the
+                                  order of the blocking size. Passing None
+                                  here is equivalent to passing 1.
 
     Returns:
         A 2-tuple containing the padded batch of sequences to run the
@@ -238,7 +270,7 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
     mask_arrays = np.repeat(init_keep[np.newaxis, :, :], n_mask_arrays, axis=0)
     mask_arrays[-1, :, :] = 0  # final array must be all-zeroes
 
-    idxs = greedy_order(model, seqs, mask_value)
+    idxs = greedy_order(model, seqs, mask_value, blocking=blocking)
 
     for i in range(seqs.shape[0]):
         # remove start/end/padding
@@ -252,7 +284,7 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
         # and len(i_idxs))
         mask_arrays[i_idxs.shape[0]:, i, :] = 0
 
-    return seqs, mask_arrays
+    return seqs, _block_mask_arrays(mask_arrays, blocking)
 
 
 def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
