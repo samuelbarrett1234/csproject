@@ -26,7 +26,7 @@ def greedy_order(model, seqs, mask_value, blocking=None):
 
         for k in range(min(blocking, idxs.shape[1] - i * blocking)):
             maxs = np.argmax(Hs, axis=-1)
-            Hs[maxs] = 0.0
+            Hs[np.arange(Hs.shape[0]), maxs] = 0.0
             # reveal the new elements
             idxs[:, i * blocking + k] = maxs
             mask_array[np.arange(0, seqs.shape[0], dtype=np.int32), maxs] = 0
