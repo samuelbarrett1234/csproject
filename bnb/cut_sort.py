@@ -7,7 +7,7 @@ procedure.
 import numpy as np
 
 
-def cut_sort(model, seqs, mask_value, blocking):
+def cut_sort(model, seqs, mask_value, blocking=None):
     if blocking is None:
         blocking = 1
 
