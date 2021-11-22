@@ -111,3 +111,84 @@ CREATE TABLE Predictions(
     lbl INTEGER NOT NULL,
     PRIMARY KEY(lbltype, predictor, ncd_formula, compid, seqid)
 );
+
+
+CREATE VIEW ResultAccuracies AS
+WITH PredVsTrue AS (
+    SELECT Predictions.lbltype, compid, predictor, ncd_formula, seqpart,
+    CASE WHEN Predictions.lbl = Labels.lbl THEN 1.0 ELSE 0.0 END AS correct
+    FROM Predictions NATURAL JOIN Sequences
+    JOIN Labels ON Labels.seqid = Predictions.seqid AND Labels.lbltype = Predictions.lbltype
+),
+Train AS (
+    SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS train_acc
+    FROM PredVsTrue WHERE seqpart = 0 GROUP BY lbltype, compid, predictor, ncd_formula
+),
+Val AS (
+    SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS val_acc
+    FROM PredVsTrue WHERE seqpart = 1 GROUP BY lbltype, compid, predictor, ncd_formula
+),
+Test AS (
+    SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS test_acc
+    FROM PredVsTrue WHERE seqpart = 2 GROUP BY lbltype, compid, predictor, ncd_formula
+)
+SELECT * FROM Train NATURAL JOIN Val NATURAL JOIN Test;
+
+
+CREATE VIEW ResultSizes AS
+WITH Train AS (
+    SELECT compid, AVG(compsz) AS train_sz
+    FROM CompressionSizes NATURAL JOIN Sequences
+    WHERE seqpart = 0
+    GROUP BY compid
+),
+Val AS (
+    SELECT compid, AVG(compsz) AS val_sz
+    FROM CompressionSizes NATURAL JOIN Sequences
+    WHERE seqpart = 1
+    GROUP BY compid
+),
+Test AS (
+    SELECT compid, AVG(compsz) AS test_sz
+    FROM CompressionSizes NATURAL JOIN Sequences
+    WHERE seqpart = 2
+    GROUP BY compid
+)
+SELECT * FROM Train NATURAL JOIN Val NATURAL JOIN Test;
+
+
+CREATE VIEW ResultRatios AS
+WITH SequenceLengths AS (
+    SELECT seqid, MAX(svidx) + 1 AS slen FROM SequenceValues
+    GROUP BY seqid
+),
+Train AS (
+    SELECT compid, AVG(compsz / slen) AS train_rt
+    FROM CompressionSizes NATURAL JOIN SequenceLengths
+    NATURAL JOIN Sequences WHERE seqpart = 0
+    GROUP BY compid
+),
+Val AS (
+    SELECT compid, AVG(compsz / slen) AS val_rt
+    FROM CompressionSizes NATURAL JOIN SequenceLengths
+    NATURAL JOIN Sequences WHERE seqpart = 0
+    GROUP BY compid
+),
+Test AS (
+    SELECT compid, AVG(compsz / slen) AS test_rt
+    FROM CompressionSizes NATURAL JOIN SequenceLengths
+    NATURAL JOIN Sequences WHERE seqpart = 0
+    GROUP BY compid
+)
+SELECT * FROM Train NATURAL JOIN Val NATURAL JOIN Test;
+
+
+CREATE TABLE LabelScores(
+    compid INTEGER NOT NULL REFERENCES Compressors(compid),
+    ncd_formula TEXT NOT NULL,
+    lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype),
+    score REAL NOT NULL,
+    PRIMARY KEY(compid, ncd_formula, lbltype)
+);
+
+

@@ -17,27 +17,9 @@ import progressbar as pgb
 def compute_accuracy(db):
     cur = db.cursor()
     cur.execute("""
-    WITH PredVsTrue AS (
-        SELECT Predictions.lbltype, compid, predictor, ncd_formula, seqpart,
-        CASE WHEN Predictions.lbl = Labels.lbl THEN 1.0 ELSE 0.0 END AS correct
-        FROM Predictions NATURAL JOIN Sequences
-        JOIN Labels ON Labels.seqid = Predictions.seqid AND Labels.lbltype = Predictions.lbltype
-    ),
-    Train AS (
-        SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS train_acc
-        FROM PredVsTrue WHERE seqpart = 0 GROUP BY lbltype, compid, predictor, ncd_formula
-    ),
-    Val AS (
-        SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS val_acc
-        FROM PredVsTrue WHERE seqpart = 1 GROUP BY lbltype, compid, predictor, ncd_formula
-    ),
-    Test AS (
-        SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS test_acc
-        FROM PredVsTrue WHERE seqpart = 2 GROUP BY lbltype, compid, predictor, ncd_formula
-    )
     SELECT lbltype_name, compname, comprepeat, predictor, ncd_formula,
     train_acc, val_acc, test_acc
-    FROM Train NATURAL JOIN Val NATURAL JOIN Test NATURAL JOIN Compressors NATURAL JOIN LabelTypes
+    FROM ResultAccuracies NATURAL JOIN Compressors NATURAL JOIN LabelTypes
     """)
     return (
         ('Label_Type', 'Compression_Algorithm',
@@ -51,30 +33,11 @@ def compute_accuracy(db):
 def compute_compression_sizes(db):
     cur = db.cursor()
     cur.execute("""
-    WITH Train AS (
-        SELECT compid, AVG(compsz) AS train_sz
-        FROM CompressionSizes NATURAL JOIN Sequences
-        WHERE seqpart = 0
-        GROUP BY compid
-    ),
-    Val AS (
-        SELECT compid, AVG(compsz) AS val_sz
-        FROM CompressionSizes NATURAL JOIN Sequences
-        WHERE seqpart = 1
-        GROUP BY compid
-    ),
-    Test AS (
-        SELECT compid, AVG(compsz) AS test_sz
-        FROM CompressionSizes NATURAL JOIN Sequences
-        WHERE seqpart = 2
-        GROUP BY compid
-    ),
-    InputDimension AS (
+    WITH InputDimension AS (
         SELECT COUNT(*) AS n FROM Alphabet
     )
     SELECT compname, comprepeat, compd, n, train_sz, val_sz, test_sz
-    FROM Compressors NATURAL JOIN Train NATURAL JOIN Val NATURAL JOIN Test
-    NATURAL JOIN InputDimension
+    FROM Compressors NATURAL JOIN ResultSizes NATURAL JOIN InputDimension
     """)
     return (
         ('Compression_Algorithm', 'Compression_Repeat', 'Out_Dim',
@@ -86,34 +49,11 @@ def compute_compression_sizes(db):
 def compute_compression_ratios(db):
     cur = db.cursor()
     cur.execute("""
-    WITH SequenceLengths AS (
-        SELECT seqid, MAX(svidx) + 1 AS slen FROM SequenceValues
-        GROUP BY seqid
-    ),
-    InputDimension AS (
+    WITH InputDimension AS (
         SELECT COUNT(*) AS n FROM Alphabet
-    ),
-    Train AS (
-        SELECT compid, AVG(compsz / slen) AS train_rt
-        FROM CompressionSizes NATURAL JOIN SequenceLengths
-        NATURAL JOIN Sequences WHERE seqpart = 0
-        GROUP BY compid
-    ),
-    Val AS (
-        SELECT compid, AVG(compsz / slen) AS val_rt
-        FROM CompressionSizes NATURAL JOIN SequenceLengths
-        NATURAL JOIN Sequences WHERE seqpart = 0
-        GROUP BY compid
-    ),
-    Test AS (
-        SELECT compid, AVG(compsz / slen) AS test_rt
-        FROM CompressionSizes NATURAL JOIN SequenceLengths
-        NATURAL JOIN Sequences WHERE seqpart = 0
-        GROUP BY compid
     )
     SELECT compname, comprepeat, compd, n, train_rt, val_rt, test_rt
-    FROM Compressors NATURAL JOIN Train NATURAL JOIN Val NATURAL JOIN Test
-    NATURAL JOIN InputDimension
+    FROM Compressors NATURAL JOIN ResultRatios NATURAL JOIN InputDimension
     """)
     return (
         ('Compression_Algorithm', 'Compression_Repeat', 'Out_Dim',
@@ -127,6 +67,8 @@ def compute_lbl_scores(db):
 
     cur = db.cursor()
     cur2 = db.cursor()
+
+    cur.execute("DELETE FROM LabelScores")
 
     cur.execute("SELECT MAX(seqid) + 1 FROM Sequences WHERE seq_is_pair = 0")
     N = cur.fetchone()[0]
@@ -167,11 +109,16 @@ def compute_lbl_scores(db):
         for left, right, dist in cur.fetchall():
             D[(left, right)] = max(dist, 0.0)  # clip to be >= 0
         # compute Laplacian
-        D = scipy.sparse.csgraph.laplacian(D)
+        D = scipy.sparse.csgraph.laplacian(D, normed=True)
         # now score each label type:
         for lbltype, Y in lbl_mats.items():
             s = sum((Y.T @ D @ Y).diagonal()) / Y.shape[1]
             assert(s >= 0)
+            # insert into DB but also to the list `results` which we will return
+            cur.execute("""
+                INSERT INTO LabelScores(compid, ncd_formula, lbltype, score)
+                VALUES (?, ?, ?, ?)
+            """, (compid, ncd_formula, lbltype, s))
             results.append(
                 (compname, ncd_formula, lbltype_names[lbltype], s)
             )
@@ -221,4 +168,5 @@ if __name__ == "__main__":
             writer.writerow(headers)
             writer.writerows(pgb.progressbar(data))
 
+    db.commit()
     db.close()
