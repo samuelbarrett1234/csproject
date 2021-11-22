@@ -11,6 +11,11 @@ sequences, but with mask values added
 a single integral 2D array.
 `mask` is a boolean array, representing the positions
 you should apply loss to.
+`blocking` is an optional integer which causes it to
+mask tokens in groups of this size. This will make for
+a slightly worse approximation, but the speedup will be
+on the order of the blocking size. Passing None here
+is equivalent to passing 1.
 """
 
 
@@ -119,14 +124,15 @@ def bnb_masking(model, seqs, pad_value, mask_value, alphabet_size, min_length=No
     return _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value)
 
 
-def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size, min_length=None):
+def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size,
+                     min_length=None, blocking=None):
     """Mask the given list of sequences according to
     the cutting sort algorithm. Returns the sequences
     padded-batched into a matrix, with masking tokens inserted.
     """    
     seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
 
-    idxs = cut_sort(model, seqs, mask_value)
+    idxs = cut_sort(model, seqs, mask_value, blocking=blocking)
     mask = np.zeros_like(seqs, dtype=np.bool)  # array of Falses
 
     # mask the sequences in the batch separately due to issues
@@ -143,14 +149,15 @@ def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size, min_leng
     return _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value)
 
 
-def greedy_masking(model, seqs, pad_value, mask_value, alphabet_size, min_length=None):
+def greedy_masking(model, seqs, pad_value, mask_value, alphabet_size,
+                   min_length=None, blocking=None):
     """Mask the given list of sequences according to
     the greedy masking algorithm. Returns the sequences
     padded-batched into a matrix, with masking tokens inserted.
     """    
     seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
 
-    idxs = greedy_order(model, seqs, mask_value)
+    idxs = greedy_order(model, seqs, mask_value, blocking=blocking)
     mask = np.zeros_like(seqs, dtype=np.bool)  # array of Falses
 
     # mask the sequences in the batch separately due to issues

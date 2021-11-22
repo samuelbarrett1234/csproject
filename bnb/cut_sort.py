@@ -28,7 +28,7 @@ def cut_sort(model, seqs, mask_value, blocking=None):
 
         block_masked_seqs = np.copy(seqs)
         block_masked_seqs[:, block_idxs] = mask_value
-        ps_i = model(block_masked_seqs)
+        ps_i = model(block_masked_seqs)[:, block_idxs]
         hs[:, block_idxs] = np.sum((-ps_i * np.ma.log(ps_i)).filled(0.0), axis=-1)
 
     return np.argsort(hs, axis=-1)
