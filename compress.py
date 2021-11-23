@@ -35,6 +35,9 @@ COMPRESSORS = {
 
 
 def parse_config(config_str):
+    if config_str == '':
+        return None
+
     for stmt in config_str.split(','):
         stmt = stmt.split('=')
         assert(len(stmt) == 2)
@@ -80,7 +83,6 @@ if __name__ == "__main__":
         exit(-1)
 
     config = dict(parse_config(args.comp_config))
-    print(config)
     compname = '-'.join((args.compressor, args.comp_config))
     print("*** BEGINNING TRAINING AND RUNNING OF", compname, "***")
 
