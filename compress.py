@@ -147,10 +147,20 @@ if __name__ == "__main__":
 
     # SAVE THE COMPRESSOR'S METADATA
 
-    cur.execute("INSERT INTO Compressors(compid, compname, comprepeat, compdate, "
-                "compd, comp_fine_tuning, comp_method) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (compid, args.compressor, comprepeat, compdate, compd,
-                 comp.fine_tuning_method(), comp.comp_method()))
+    # insert compressor type if not exists
+    cur.execute("SELECT 1 FROM CompressorArchitecture WHERE compname = ?",
+                (args.compressor,))
+    if cur.fetchone() is None:
+        cur.execute("INSERT INTO CompressorArchitecture(compname, "
+                    "compd, comp_fine_tuning, comp_method, comp_deep) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (args.compressor, compd,
+                     comp.fine_tuning_method(),
+                     comp.comp_method(), 1))
+    # insert compressor instance
+    cur.execute("INSERT INTO Compressors(compid, compname, comprepeat, compdate) "
+                "VALUES (?, ?, ?, ?)",
+                (compid, args.compressor, comprepeat, compdate))
 
     # RUN THE COMPRESSOR ON THE ENTIRE DATASET, SAVE THE RESULTING COMPRESSION SIZES
 

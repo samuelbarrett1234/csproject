@@ -37,7 +37,8 @@ def compute_compression_sizes(db):
         SELECT COUNT(*) AS n FROM Alphabet
     )
     SELECT compname, comprepeat, compd, n, train_sz, val_sz, test_sz
-    FROM Compressors NATURAL JOIN ResultSizes NATURAL JOIN InputDimension
+    FROM Compressors NATURAL JOIN CompressorArchitecture
+    NATURAL JOIN ResultSizes NATURAL JOIN InputDimension
     """)
     return (
         ('Compression_Algorithm', 'Compression_Repeat', 'Out_Dim',
@@ -53,7 +54,8 @@ def compute_compression_ratios(db):
         SELECT COUNT(*) AS n FROM Alphabet
     )
     SELECT compname, comprepeat, compd, n, train_rt, val_rt, test_rt
-    FROM Compressors NATURAL JOIN ResultRatios NATURAL JOIN InputDimension
+    FROM Compressors NATURAL JOIN CompressorArchitecture
+    NATURAL JOIN ResultRatios NATURAL JOIN InputDimension
     """)
     return (
         ('Compression_Algorithm', 'Compression_Repeat', 'Out_Dim',

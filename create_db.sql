@@ -72,16 +72,26 @@ CREATE TABLE SequencePairings(
 CREATE INDEX seq_pair_left ON SequencePairings(seqid_left, seqid_right, seqid_out);
 CREATE INDEX seq_pair_right ON SequencePairings(seqid_right, seqid_left, seqid_out);
 
+CREATE TABLE CompressorArchitecture(
+    compname TEXT PRIMARY KEY,  -- the name of the compressor
+
+    compd INTEGER NOT NULL,  -- the size of the compressor's output alphabet
+    comp_fine_tuning TEXT NULL,  -- the fine-tuning method, if applicable
+    comp_method TEXT NULL, -- the compression "submethod", if applicable
+    comp_deep INTEGER NOT NULL,  -- 1 if a deep model, else 0
+
+    CHECK(comp_deep IN (0, 1))
+);
+
 CREATE TABLE Compressors(
     compid INTEGER PRIMARY KEY,
-    compname TEXT NOT NULL,  -- the name of the compressor
+    compname TEXT NOT NULL REFERENCES CompressorArchitecture(compname),
+
     -- if the compressor relies on randomness and you want to do repeats,
     -- store the index of the repeat here:
     comprepeat INTEGER NOT NULL DEFAULT 0,
     compdate TEXT NOT NULL,  -- date time of script invocation for creating this compressor
-    compd INTEGER NOT NULL,  -- the size of the compressor's output alphabet
-    comp_fine_tuning TEXT NULL,  -- the fine-tuning method, if applicable
-    comp_method TEXT NULL, -- the compression "submethod", if applicable
+
     UNIQUE(compname, comprepeat)
 );
 
@@ -190,5 +200,3 @@ CREATE TABLE LabelScores(
     score REAL NOT NULL,
     PRIMARY KEY(compid, ncd_formula, lbltype)
 );
-
-
