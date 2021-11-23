@@ -150,6 +150,12 @@ Test AS (
 SELECT * FROM Train NATURAL JOIN Val NATURAL JOIN Test;
 
 
+CREATE VIEW BestCompPredMethod AS
+SELECT lbltype, compid, predictor, ncd_formula, MAX(val_acc) AS unused_val_acc
+FROM ResultAccuracies
+GROUP BY lbltype, compid;
+
+
 CREATE VIEW ResultSizes AS
 WITH Train AS (
     SELECT compid, AVG(compsz) AS train_sz
