@@ -10,7 +10,6 @@ NOTE: might want auxiliary data like the chosen BERT masking procedure
 
 
 import os
-import itertools
 import datetime
 import argparse as ap
 import sqlite3 as sql
@@ -28,29 +27,25 @@ COMPRESSORS = {
     'gzip': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.GZip()]),
     'lzma': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.LZMA()]),
     'zlib': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
-}
-# construct BERT compressors algorithmically
-BERT_INIT_STATES = [None, 'bert-base-uncased', 'bert-large-uncased']
-BERT_COMPS = ['L2R', 'cutting-sort', 'greedy']
-BERT_FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
-BERT_REVERSES = [False, True]
-for init_state, comp_type, fine_tuning, reverse in itertools.product(BERT_INIT_STATES,
-                                                                     BERT_COMPS,
-                                                                     BERT_FINE_TUNING,
-                                                                     BERT_REVERSES):
-    name = 'BERT-' + (init_state or 'untrained')
-    if fine_tuning is not None:
-        name += '-' + fine_tuning
-    name += '-' + comp_type
-    if reverse:
-        name += '-reversed'
-    # warning:
-    # https://stackoverflow.com/questions/2295290/what-do-lambda-function-closures-capture
-    COMPRESSORS[name] = lambda data_dir, rep, init_state=init_state, fine_tuning=fine_tuning, comp_type=comp_type, reverse=reverse: comp.BERT(
-        data_dir, init_state=init_state, fine_tuning=fine_tuning,
-        comp=comp_type, train_repeat=rep, reverse_order=reverse,
-        out_alphabet_sz=256  # byte
+    'bert': lambda data_dir, rep, **kwargs: comp.BERT(
+        data_dir, train_repeat=rep, out_alphabet_sz=256,  # byte
+        **kwargs
     )
+}
+
+
+def parse_config(config_str):
+    for stmt in config_str.split(','):
+        stmt = stmt.split('=')
+        assert(len(stmt) == 2)
+        # now try to infer the type of stmt[1]
+        if stmt[1] in ('True', 'False', 'None'):
+            yield stmt[0], eval(stmt[1])
+        else:
+            try:
+                yield stmt[0], int(stmt[1])
+            except ValueError:
+                yield stmt[0], stmt[1]
 
 
 if __name__ == "__main__":
@@ -62,6 +57,10 @@ if __name__ == "__main__":
     parser.add_argument("compressor", type=str,
                         help="The name of the compressor to run. Must "
                              "be one of: " + ", ".join(COMPRESSORS.keys()))
+    parser.add_argument("--comp-config", type=str, default="",
+                        help="Optional configurations to pass "
+                             "to model constructor. Must be a comma-"
+                             "separated list of key=value pairs.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.db):
@@ -76,6 +75,10 @@ if __name__ == "__main__":
         print("Error:", args.compressor, "is not a valid compressor.")
         print("Allowed values are:", ", ".join(COMPRESSORS.keys()))
         exit(-1)
+
+    config = dict(parse_config(args.comp_config))
+    compname = '-'.join((args.compressor, args.comp_config))
+    print("*** BEGINNING TRAINING AND RUNNING OF", compname, "***")
 
     db = sql.connect(args.db, check_same_thread=False)
     cur = db.cursor()
@@ -97,7 +100,7 @@ if __name__ == "__main__":
     else:
         compid = compid[0]
     cur.execute("SELECT MAX(comprepeat) + 1 FROM Compressors WHERE compname = ?",
-                (args.compressor,))
+                (compname,))
     comprepeat = cur.fetchone()
     if comprepeat is None:
         comprepeat = 0
@@ -142,25 +145,29 @@ if __name__ == "__main__":
 
     print("Creating/training compressor...")
 
-    comp = COMPRESSORS[args.compressor](args.model_data_dir, comprepeat)
+    comp = COMPRESSORS[args.compressor](args.model_data_dir, comprepeat, **config)
     compd = comp.train(alphabet_size, iter_train, iter_val)
 
     # SAVE THE COMPRESSOR'S METADATA
 
     # insert compressor type if not exists
     cur.execute("SELECT 1 FROM CompressorArchitecture WHERE compname = ?",
-                (args.compressor,))
+                (compname,))
     if cur.fetchone() is None:
         cur.execute("INSERT INTO CompressorArchitecture(compname, "
-                    "compd, comp_fine_tuning, comp_method, comp_deep) "
-                    "VALUES (?, ?, ?, ?, ?)",
-                    (args.compressor, compd,
-                     comp.fine_tuning_method(),
-                     comp.comp_method(), 1))
+                    "compd, comp_deep) "
+                    "VALUES (?, ?, ?)",
+                    (compname, compd, 1))
+        cur.executemany(
+            "INSERT INTO CompressorArchitectureConfig("
+            "compname, comp_config_key, comp_config_value) "
+            "VALUES(?, ?, ?)",
+            [(compname, k, v) for k, v in config.items()]
+        )
     # insert compressor instance
     cur.execute("INSERT INTO Compressors(compid, compname, comprepeat, compdate) "
                 "VALUES (?, ?, ?, ?)",
-                (compid, args.compressor, comprepeat, compdate))
+                (compid, compname, comprepeat, compdate))
 
     # RUN THE COMPRESSOR ON THE ENTIRE DATASET, SAVE THE RESULTING COMPRESSION SIZES
 

@@ -26,17 +26,12 @@ import compressors.bnb_compression as bnb_compression
 import masking
 
 
-BATCH_SIZE_TRAIN, BATCH_SIZE_COMP = 32, 8
-MAX_LENGTH_TRAIN, MAX_LENGTH_COMP = 128, 512
-COMP_BLOCKING = 16
 INIT_STATE = [None, 'bert-base-uncased', 'bert-large-uncased']
 FINE_TUNING = [None, 'bert', 'span-bert', 'cutting-sort', 'greedy']
 COMPRESSION = ['L2R', 'cutting-sort', 'greedy']
 EXPERT_GENERATORS = {
-    'last-10': lambda iter, mask: masking.LastNMaskGeneratorExpert(10, iter, mask, BATCH_SIZE_TRAIN)
+    'last-10': lambda iter, mask, batch_sz: masking.LastNMaskGeneratorExpert(10, iter, mask, batch_sz)
 }
-N_FINE_TUNE_EPOCHS = 4
-LEARNING_RATE = 1.0e-3
 
 
 def _chop(s, max_len):
@@ -72,8 +67,11 @@ def _reverse_mask_arrays(mask_arrays):
 
 class BERT(Compressor):
     def __init__(self, model_dir,
-                 init_state, fine_tuning, comp,
+                 init_state=None, fine_tuning=None, comp='L2R',
                  mask_value=None, pad_value=None,
+                 batch_sz_train=32, batch_sz_comp=8,
+                 max_len_train=128, max_len_comp=512,
+                 blocking=16, num_epochs=4, learning_rate=1.0e-3,
                  train_repeat=0, out_alphabet_sz=2,
                  reverse_order=False):
         """Create a BERT compressor model.
@@ -113,6 +111,13 @@ class BERT(Compressor):
         self.reverse = reverse_order
         self.repeat = train_repeat
         self._model_obj = None  # loaded in `train`
+        self.batch_sz_train = batch_sz_train
+        self.batch_sz_comp = batch_sz_comp
+        self.max_len_train = max_len_train
+        self.max_len_comp = max_len_comp
+        self.blocking = blocking
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
 
         self._out_alphabet_sz = out_alphabet_sz
         if self.init_state is not None:
@@ -160,7 +165,7 @@ class BERT(Compressor):
                         vocab_size=self._in_alphabet_sz))
 
             if self.fine_tuning is not None:
-                optimizer = tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE)
+                optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
                 self._model_obj.compile(
                     optimizer=optimizer,
                     loss=self._model_obj.compute_loss)
@@ -177,7 +182,7 @@ class BERT(Compressor):
 
     def compressmany(self, seqs):
         chopped_seqs = map(list, map(
-            lambda s: _chop(s, MAX_LENGTH_COMP),
+            lambda s: _chop(s, self.max_len_comp),
             seqs))
 
         csbuf = []  # chopped sequence buffer
@@ -188,11 +193,11 @@ class BERT(Compressor):
             cslenq.append(len(cs))
 
             # while we can run the model on new data
-            while len(csbuf) >= BATCH_SIZE_COMP:
+            while len(csbuf) >= self.batch_sz_comp:
                 # compress available data
-                codebuf += self._compress_batch(csbuf[:BATCH_SIZE_COMP])
+                codebuf += self._compress_batch(csbuf[:self.batch_sz_comp])
                 # reduce buffer
-                csbuf = csbuf[BATCH_SIZE_COMP:]
+                csbuf = csbuf[self.batch_sz_comp:]
 
             # while we can extract data from the output of the model
             while len(cslenq) > 0 and len(codebuf) >= cslenq[0]:
@@ -206,7 +211,7 @@ class BERT(Compressor):
         if len(cslenq) > 0:
             assert(len(csbuf) > 0)
             # arbitrarily extend `csbuf` to fit the batch size
-            csbuf += [csbuf[0]] * (BATCH_SIZE_COMP - len(csbuf))
+            csbuf += [csbuf[0]] * (self.batch_sz_comp - len(csbuf))
             # compress it
             codebuf += self._compress_batch(csbuf)
             # empty it (not actually necessary)
@@ -226,26 +231,26 @@ class BERT(Compressor):
         seqs = list([np.array(xs, dtype=np.int32) for xs in seqs])
 
         # check dimensions of input
-        assert(len(seqs) == BATCH_SIZE_COMP)
+        assert(len(seqs) == self.batch_sz_comp)
         largest_seq = max(map(len, seqs))
-        assert(largest_seq <= MAX_LENGTH_COMP)
+        assert(largest_seq <= self.max_len_comp)
 
         if self.comp == 'L2R':
             seqs, mask_arrays = bnb_compression.serialise_l2r(
                 seqs, self.pad_value, keep_start_end=True,
-                blocking=COMP_BLOCKING
+                blocking=self.blocking
             )
         elif self.comp == 'cutting-sort':
             seqs, mask_arrays = bnb_compression.serialise_cutting_sort(
                 self._call_model, seqs, self.mask_value, self.pad_value,
                 keep_start_end=True,
-                blocking=COMP_BLOCKING
+                blocking=self.blocking
             )
         elif self.comp == 'greedy':
             seqs, mask_arrays = bnb_compression.serialise_greedy(
                 self._call_model, seqs, self.mask_value, self.pad_value,
                 keep_start_end=True,
-                blocking=COMP_BLOCKING
+                blocking=self.blocking
             )
 
         if self.reverse:
@@ -266,7 +271,7 @@ class BERT(Compressor):
         def _create_chopped_iter(iter):
             def f():
                 for s in iter():
-                    for t in _chop(s, MAX_LENGTH_TRAIN):
+                    for t in _chop(s, self.max_len_train):
                         yield np.array(t, dtype=np.int32)
             return f
 
@@ -280,8 +285,8 @@ class BERT(Compressor):
         # here we pass our masking function (parameterised by an arbitrary
         # model) which allows the expert generators to perform masking and
         # cache it
-        iter_train = EXPERT_GENERATORS['last-10'](iter_train, self._fine_tune_mask_seqs)
-        # iter_val = EXPERT_GENERATORS['last-10'](iter_val, self._fine_tune_mask_seqs)
+        iter_train = EXPERT_GENERATORS['last-10'](
+            iter_train, self._fine_tune_mask_seqs, self.batch_sz_train)
 
         def _prepare_batch(data):
             seqs, masked_seqs, mask = data
@@ -290,10 +295,9 @@ class BERT(Compressor):
             # i.e. places where `mask` is false.)
             return (masked_seqs, np.where(mask, seqs, -100))
 
-        for epoch in range(N_FINE_TUNE_EPOCHS):
+        for epoch in range(self.num_epochs):
             print("Starting epoch", epoch)
             iter_train.update(self._model_obj)
-            # iter_val.update(self._model_obj)
             self._model_obj.fit(
                 map(_prepare_batch, iter_train()),
                 epochs=1
@@ -316,21 +320,21 @@ class BERT(Compressor):
         if self.fine_tuning == 'bert':
             return masking.bert_masking(
                 seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
+                self._in_alphabet_sz, min_length=self.max_len_train)
         elif self.fine_tuning == 'span-bert':
             return masking.span_bert_masking(
                 seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN)
+                self._in_alphabet_sz, min_length=self.max_len_train)
         elif self.fine_tuning == 'cutting-sort':
             return masking.cut_sort_masking(
                 model, seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN,
-                blocking=COMP_BLOCKING)
+                self._in_alphabet_sz, min_length=self.max_len_train,
+                blocking=self.blocking)
         elif self.fine_tuning == 'greedy':
             return masking.greedy_masking(
                 model, seqs, self.pad_value, self.mask_value,
-                self._in_alphabet_sz, min_length=MAX_LENGTH_TRAIN,
-                blocking=COMP_BLOCKING)
+                self._in_alphabet_sz, min_length=self.max_len_train,
+                blocking=self.blocking)
 
 
     def fine_tuning_method(self):

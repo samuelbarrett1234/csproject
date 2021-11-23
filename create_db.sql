@@ -76,11 +76,16 @@ CREATE TABLE CompressorArchitecture(
     compname TEXT PRIMARY KEY,  -- the name of the compressor
 
     compd INTEGER NOT NULL,  -- the size of the compressor's output alphabet
-    comp_fine_tuning TEXT NULL,  -- the fine-tuning method, if applicable
-    comp_method TEXT NULL, -- the compression "submethod", if applicable
     comp_deep INTEGER NOT NULL,  -- 1 if a deep model, else 0
 
     CHECK(comp_deep IN (0, 1))
+);
+
+CREATE TABLE CompressorArchitectureConfig(
+    compname TEXT NOT NULL REFERENCES CompressorArchitecture(compname),
+    comp_config_key TEXT NOT NULL,
+    comp_config_value TEXT NOT NULL,
+    PRIMARY KEY(compname, comp_config_key)
 );
 
 CREATE TABLE Compressors(
