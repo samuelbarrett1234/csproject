@@ -66,14 +66,14 @@ def _reverse_mask_arrays(mask_arrays):
 
 
 class BERT(Compressor):
-    def __init__(self, model_dir,
+    def __init__(self, model_dir, model_name,
                  init_state=None, fine_tuning=None, comp='L2R',
                  mask_value=None, pad_value=None,
                  batch_sz_train=32, batch_sz_comp=8,
                  max_len_train=128, max_len_comp=512,
                  blocking=16, num_epochs=4, learning_rate=1.0e-3,
                  train_repeat=0, out_alphabet_sz=2,
-                 reverse_order=False):
+                 reverse_order=False, masking_prop=0.5):
         """Create a BERT compressor model.
 
         Args:
@@ -118,6 +118,7 @@ class BERT(Compressor):
         self.blocking = blocking
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
+        self.masking_prop = masking_prop
 
         self._out_alphabet_sz = out_alphabet_sz
         if self.init_state is not None:
@@ -132,12 +133,7 @@ class BERT(Compressor):
             self.mask_value = mask_value
             self.pad_value = pad_value
 
-        self.model_fname = ''
-        if self.init_state is not None:
-            self.model_fname += self.init_state + '-'
-        if self.fine_tuning is not None:
-            self.model_fname += self.fine_tuning + '-'
-        self.model_fname += str(self.repeat)
+        self.model_fname = model_name + str(self.repeat)
         self.model_fname = os.path.join(
             model_dir, self.model_fname
         )
@@ -329,12 +325,12 @@ class BERT(Compressor):
             return masking.cut_sort_masking(
                 model, seqs, self.pad_value, self.mask_value,
                 self._in_alphabet_sz, min_length=self.max_len_train,
-                blocking=self.blocking)
+                blocking=self.blocking, prop=self.masking_prop)
         elif self.fine_tuning == 'greedy':
             return masking.greedy_masking(
                 model, seqs, self.pad_value, self.mask_value,
                 self._in_alphabet_sz, min_length=self.max_len_train,
-                blocking=self.blocking)
+                blocking=self.blocking, prop=self.masking_prop)
 
 
     def fine_tuning_method(self):

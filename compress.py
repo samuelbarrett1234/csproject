@@ -23,12 +23,12 @@ import compressors as comp
 # used for constructing distinct filenames for model data
 # corresponding to different runs
 COMPRESSORS = {
-    'bzip2': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.BZ2()]),
-    'gzip': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.GZip()]),
-    'lzma': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.LZMA()]),
-    'zlib': lambda data_dir, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
-    'bert': lambda data_dir, rep, **kwargs: comp.BERT(
-        data_dir, train_repeat=rep, out_alphabet_sz=256,  # byte
+    'bzip2': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.BZ2()]),
+    'gzip': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.GZip()]),
+    'lzma': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.LZMA()]),
+    'zlib': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
+    'bert': lambda data_dir, name, rep, **kwargs: comp.BERT(
+        data_dir, name, train_repeat=rep, out_alphabet_sz=256,  # byte
         **kwargs
     )
 }
@@ -45,7 +45,10 @@ def parse_config(config_str):
             try:
                 yield stmt[0], int(stmt[1])
             except ValueError:
-                yield stmt[0], stmt[1]
+                try:
+                    yield stmt[0], float(stmt[1])
+                except ValueError:
+                    yield stmt[0], stmt[1]
 
 
 if __name__ == "__main__":
@@ -77,6 +80,7 @@ if __name__ == "__main__":
         exit(-1)
 
     config = dict(parse_config(args.comp_config))
+    print(config)
     compname = '-'.join((args.compressor, args.comp_config))
     print("*** BEGINNING TRAINING AND RUNNING OF", compname, "***")
 
@@ -145,7 +149,7 @@ if __name__ == "__main__":
 
     print("Creating/training compressor...")
 
-    comp = COMPRESSORS[args.compressor](args.model_data_dir, comprepeat, **config)
+    comp = COMPRESSORS[args.compressor](args.model_data_dir, compname, comprepeat, **config)
     compd = comp.train(alphabet_size, iter_train, iter_val)
 
     # SAVE THE COMPRESSOR'S METADATA

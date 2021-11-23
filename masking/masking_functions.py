@@ -125,7 +125,7 @@ def bnb_masking(model, seqs, pad_value, mask_value, alphabet_size, min_length=No
 
 
 def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size,
-                     min_length=None, blocking=None):
+                     min_length=None, blocking=None, prop=0.5):
     """Mask the given list of sequences according to
     the cutting sort algorithm. Returns the sequences
     padded-batched into a matrix, with masking tokens inserted.
@@ -142,7 +142,7 @@ def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size,
         # by the initial keep set
         cut_sorted_idxs = idxs[i, init_keep[i, idxs[i]] == 1]
         # mask approximately the first half of these
-        cut_sorted_idxs = cut_sorted_idxs[:len(cut_sorted_idxs) // 2]
+        cut_sorted_idxs = cut_sorted_idxs[:int(len(cut_sorted_idxs) * prop)]
         # now we have the indices to mask!
         mask[i, cut_sorted_idxs] = True
 
@@ -150,7 +150,7 @@ def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size,
 
 
 def greedy_masking(model, seqs, pad_value, mask_value, alphabet_size,
-                   min_length=None, blocking=None):
+                   min_length=None, blocking=None, prop=0.5):
     """Mask the given list of sequences according to
     the greedy masking algorithm. Returns the sequences
     padded-batched into a matrix, with masking tokens inserted.
@@ -167,7 +167,7 @@ def greedy_masking(model, seqs, pad_value, mask_value, alphabet_size,
         # by the initial keep set
         cut_sorted_idxs = idxs[i, init_keep[i, idxs[i]] == 1]
         # mask approximately the first half of these
-        cut_sorted_idxs = cut_sorted_idxs[:len(cut_sorted_idxs) // 2]
+        cut_sorted_idxs = cut_sorted_idxs[:int(len(cut_sorted_idxs) * prop)]
         # now we have the indices to mask!
         mask[i, cut_sorted_idxs] = True
 
