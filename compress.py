@@ -83,7 +83,9 @@ if __name__ == "__main__":
         exit(-1)
 
     config = dict(parse_config(args.comp_config))
-    compname = '-'.join((args.compressor, args.comp_config))
+    compname = args.compressor
+    if len(config) > 0:
+        compname += '-' + args.comp_config
     print("*** BEGINNING TRAINING AND RUNNING OF", compname, "***")
 
     db = sql.connect(args.db, check_same_thread=False)
@@ -160,10 +162,11 @@ if __name__ == "__main__":
     cur.execute("SELECT 1 FROM CompressorArchitecture WHERE compname = ?",
                 (compname,))
     if cur.fetchone() is None:
+        # TODO: extend compressor API with a `.is_deep()` method
         cur.execute("INSERT INTO CompressorArchitecture(compname, "
                     "compd, comp_deep) "
                     "VALUES (?, ?, ?)",
-                    (compname, compd, 1))
+                    (compname, compd, 1 if args.compressor == 'bert' else 0))
         cur.executemany(
             "INSERT INTO CompressorArchitectureConfig("
             "compname, comp_config_key, comp_config_value) "
