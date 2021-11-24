@@ -317,6 +317,7 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
                                in the batch.
     """
     assert(np.all(mask_arrays[-1] == 0))
+    assert(not np.all(mask_arrays[0] == 0))  # SOME may be 0, for padding/start/end tokens
     codes = [[] for i in range(seqs.shape[0])]
     last_seqs = None
     last_masks = None
