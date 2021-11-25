@@ -7,4 +7,4 @@ RUN echo "APT INSTALLS" \
     && apt-get -qq -y install git curl unzip sqlite3 wget
 
 RUN echo "PYTHON INSTALLS" \
-    && pip install progressbar2 numpy pytest nltk cython transformers==4.10.2 scipy spacy
+    && pip install progressbar2 numpy pytest nltk cython transformers==4.10.2 scipy spacy miditok
