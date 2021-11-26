@@ -6,3 +6,5 @@ nltk
 -c anaconda tensorflow-gpu==2.3
 cython
 miditok
+miditoolkit
+matplotlib

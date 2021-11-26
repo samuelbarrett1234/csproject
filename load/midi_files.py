@@ -3,11 +3,10 @@
 
 
 import os
-from sqlite3.dbapi2 import Error
 import sys
 import glob
-import json
 import bisect
+import pathlib
 import argparse as ap
 import sqlite3 as sql
 import progressbar as pgb
@@ -51,10 +50,22 @@ def sentence_length(q):
     return min(len(q) // 5, 6)
 
 
-def labels(midi_file, seq_tokenised):
-    return {
-        'slen': sentence_length(seq_tokenised),
+def labels(file_path, midi_file, seq_tokenised):
+    lbls = {
+        'slen': sentence_length(seq_tokenised)
     }
+    # use folder as a proxy for genre or other labelling
+    # schemes
+    # it is very important that we reverse this list,
+    # that way it allows for the possibility that not
+    # all MIDI files are found at the same file system
+    # depth
+    parents = list(map(lambda p: p.stem,
+        pathlib.Path(file_path).resolve().parents
+    ))[::-1]
+    for i, p in enumerate(parents):
+        lbls['parent' + str(i)] = p
+    return lbls
 
 
 if __name__ == "__main__":
@@ -75,7 +86,8 @@ if __name__ == "__main__":
               "Expected at:", create_db_sql)
         exit(-1)
 
-    files = glob.glob(args.midi_files)
+    files = list(filter(os.path.isfile,
+                        glob.glob(args.midi_files, recursive=True)))
     if len(files) == 0:
         print("Error: no files were matched by pattern", args.midi_files)
         exit(-1)
@@ -102,11 +114,11 @@ if __name__ == "__main__":
     for seqid, filename in enumerate(pgb.progressbar(files)):
         try:
             mf = MidiFile(filename)
+            seq = tokenizer.midi_to_tokens(mf)
         except Exception as e:
             print("Failed to load Midi file", filename)
             print("Error was:", e)
-            exit(-1)
-        seq = tokenizer.midi_to_tokens(mf)
+            continue
 
         # compute which partition this sequence falls into
         split = bisect.bisect_left(data_split, seqid)
@@ -119,7 +131,7 @@ if __name__ == "__main__":
         """, (seqid, split))
 
         # compute and save labels
-        lbls = labels(mf, seq)
+        lbls = labels(filename, mf, seq)
         for lbl_type, lbl in lbls.items():
             if lbl_type not in lbl_types:
                 lbl_types[lbl_type] = Alphabet()
@@ -159,6 +171,26 @@ if __name__ == "__main__":
             INSERT INTO LabelDictionary(lbltype, lblval, lbl)
             VALUES (?, ?, ?)
         """, map(lambda t: (lbltype,) + t, lbl_alphabet.iterate()))
+
+    # note that in our automated labelling scheme
+    # based on file paths, we will probably end up
+    # with a lot of useless labels (Useless in the
+    # sense that they are the same for all sequences).
+    # WLOG we can delete any label which takes a single
+    # value.
+    cur.execute("""
+        WITH BoringLabels AS (
+            SELECT lbltype
+            FROM LabelDictionary
+            GROUP BY lbltype
+            HAVING COUNT(lbl) = 1
+        )
+        DELETE FROM LabelTypes
+        WHERE EXISTS (
+            SELECT 1 FROM BoringLabels
+            WHERE BoringLabels.lbltype = LabelTypes.lbltype
+        )
+    """)
 
     cur.execute("COMMIT")
     db.commit()
