@@ -122,6 +122,9 @@ class BERT(Compressor):
 
         self._out_alphabet_sz = out_alphabet_sz
         if self.init_state is not None:
+            # TODO: if we get round to using initial states for non-English-NLP-tasks,
+            # we could use a dictionary mapping the initial state to the relevant
+            # tokenizer.
             tokenizer = BertTokenizer.from_pretrained(self.init_state)
             # if we are starting from a pretrained model, we expect
             # a specific input alphabet size:

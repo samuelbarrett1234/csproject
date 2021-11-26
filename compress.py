@@ -23,10 +23,14 @@ import compressors as comp
 # used for constructing distinct filenames for model data
 # corresponding to different runs
 COMPRESSORS = {
-    'bzip2': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.BZ2()]),
-    'gzip': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.GZip()]),
-    'lzma': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.LZMA()]),
-    'zlib': lambda data_dir, name, rep: comp.Chain([comp.Huffman(256), comp.ZLib()]),
+    'bzip2': lambda data_dir, name, rep, **kwargs: comp.Chain([
+        comp.Huffman(256), comp.BZ2()]),
+    'gzip': lambda data_dir, name, rep, **kwargs: comp.Chain([
+        comp.Huffman(256), comp.GZip()]),
+    'lzma': lambda data_dir, name, rep, **kwargs: comp.Chain([
+        comp.Huffman(256), comp.LZMA()]),
+    'zlib': lambda data_dir, name, rep, **kwargs: comp.Chain([
+        comp.Huffman(256), comp.ZLib()]),
     'bert': lambda data_dir, name, rep, **kwargs: comp.BERT(
         data_dir, name, train_repeat=rep, out_alphabet_sz=256,  # byte
         **kwargs
@@ -97,6 +101,15 @@ if __name__ == "__main__":
     cur.execute("SELECT MAX(tokid) + 1 FROM Alphabet")
     alphabet_size = cur.fetchone()[0]
 
+    # now get the value of the mask/pad tokens (to automatically
+    # infer, in case we aren't using pretrained models with the
+    # NLP tokeniser)
+
+    cur.execute("SELECT tokid FROM Alphabet WHERE tokval = '[MASK]'")
+    mask_value = int(cur.fetchone()[0])
+    cur.execute("SELECT tokid FROM Alphabet WHERE tokval = '[PAD]'")
+    pad_value = int(cur.fetchone()[0])
+
     # Now insert into the DB the new compressor's details
 
     cur.execute("SELECT MAX(compid) + 1 FROM Compressors")
@@ -153,7 +166,10 @@ if __name__ == "__main__":
 
     print("Creating/training compressor...")
 
-    comp = COMPRESSORS[args.compressor](args.model_data_dir, compname, comprepeat, **config)
+    comp = COMPRESSORS[args.compressor](
+        args.model_data_dir, compname, comprepeat,
+        mask_value=mask_value, pad_value=pad_value,
+        **config)
     compd = comp.train(alphabet_size, iter_train, iter_val)
 
     # SAVE THE COMPRESSOR'S METADATA
