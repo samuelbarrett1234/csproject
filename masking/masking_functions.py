@@ -20,7 +20,7 @@ is equivalent to passing 1.
 
 
 import numpy as np
-from bnb import padded_batch, solve_mask, cut_sort, greedy_order
+from bnb import padded_batch, cut_sort, greedy_order
 
 
 def _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value):
@@ -93,34 +93,6 @@ def span_bert_masking(seqs, pad_value, mask_value, alphabet_size, min_length=Non
         A[np.newaxis, :] >= starts[:, np.newaxis],
         A[np.newaxis, :] < (starts + L)[:, np.newaxis]
     )
-    return _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value)
-
-
-def bnb_masking(model, seqs, pad_value, mask_value, alphabet_size, min_length=None):
-    """Mask the given list of sequences according to
-    the branch-and-bound algorithm. Returns the sequences
-    padded-batched into a matrix, with masking tokens inserted.
-    """    
-    seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
-
-    # heuristically, mask at most 15% of the tokens
-    # (of course, by independence, we may end up masking
-    # more.)
-    n_mask_aim = max(int(0.15 * seqs.shape[1]), 1)
-    ent_bud = np.log(alphabet_size) * n_mask_aim
-    assert(ent_bud > 0.0)
-    stop_cond = lambda p, d: (p >= n_mask_aim or p == d)
-    # warning: I'm using an entropy budget which is
-    # determined using the length of the longest sequence.
-    # this is probably not a problem, but if some sequences
-    # are much shorter than others, they might end up getting
-    # completely masked.
-
-    new_seqs = solve_mask(model, ent_bud, seqs, init_keep,
-                          mask_value, seqs.shape[0],
-                          early_stopping_cond=stop_cond)
-    mask = (new_seqs == mask_value)
-
     return _apply_mask(seqs, mask, alphabet_size, mask_value, pad_value)
 
 

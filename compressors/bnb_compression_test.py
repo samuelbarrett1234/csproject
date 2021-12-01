@@ -1,6 +1,6 @@
 import numpy as np
 from compressors.bnb_compression import (
-    serialise_l2r, serialise_bnb, compress_serialisation,
+    serialise_l2r, compress_serialisation,
     serialise_cutting_sort, serialise_greedy
 )
 
@@ -35,18 +35,6 @@ def test_l2r():
        [[0, 0, 0, 0],
         [0, 0, 0, 0]]
         ], dtype=np.int32)))
-    codes = compress_serialisation(_model, seqs, mask_arrays, 257, 2)
-    assert(len(codes) == len(seqs))
-    assert(len(codes[0]) == 3 * 8)
-    assert(len(codes[1]) == 4 * 8)
-
-
-def test_bnb():
-    seqs = [
-        np.array([1, 2, 3], dtype=np.int32),
-        np.array([4, 5, 6, 7], dtype=np.int32)
-    ]
-    seqs, mask_arrays = serialise_bnb(_model, seqs, 257, 0, 10.0)
     codes = compress_serialisation(_model, seqs, mask_arrays, 257, 2)
     assert(len(codes) == len(seqs))
     assert(len(codes[0]) == 3 * 8)

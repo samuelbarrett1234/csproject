@@ -38,7 +38,7 @@ It also outputs its findings to CSV.
 - The files in the root of the repository are all executable scripts.
 - The files in the `load/` folder are all executable scripts.
 - The `compressors` folder is a package, containing compression algorithms.
-- The `bnb` folder is a package, containing code for solving the Branch and Bound optimisation problem for masking.
+- The `bnb` folder is a package, containing code for producing different token orderings, given a model.
 
 # Datasets
 - The `load/gen_random.py` data loader is clearly not associated with any dataset in particular, and just generates arbitrary data for testing.

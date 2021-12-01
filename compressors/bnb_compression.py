@@ -11,7 +11,7 @@ into a sequence of codes.
 
 
 import numpy as np
-from bnb import padded_batch, solve_mask, cut_sort, greedy_order
+from bnb import padded_batch, cut_sort, greedy_order
 from compressors.coding import huffman_codebook
 
 
@@ -72,83 +72,6 @@ def serialise_l2r(seqs, pad_value,
         mask_arrays[i] = mask_arrays[i - 1]
         mask_arrays[i, :, i - 1] = 0
     return seqs, _block_mask_arrays(mask_arrays, blocking)
-
-
-def serialise_bnb(model, seqs, mask_value, pad_value, ent_bud,
-                  keep_start_end=False, min_length=None):
-    """Serialise a list of sequences according to the output of solving
-    the branch-and-bound procedure.
-
-    Args:
-        model (callable): The model function, which takes as input a
-                          numpy array of shape (batch-size, seq-len)
-                          and outputs a probability distribution at
-                          each of those positions.
-        seqs (list of np.ndarray): A list of 1D integral vectors of
-                                   length equal to the batch size!!!
-        mask_value (int): The integer representing a masked token.
-        pad_value (int): The integer representing padding, so that the
-                         sequences can be padded to the same length and
-                         put into a batch.
-        ent_bud (float): The entropy budget - aka the minimum amount
-                         of entropy to be contained in each "new message".
-                         The smaller this is, the more messages you will
-                         send, and potentially the more compressive,
-                         however it will be slower.
-        keep_start_end (boolean): If true, do not mask the first and last token
-                                  of any sequence.
-        min_length (int, optional): If not None, force the output sequences to
-                                    be at least this long, by adding padding.
-                                    If provided, cannot be shorter than any
-                                    sequence.
-
-    Returns:
-        A 2-tuple containing the padded batch of sequences to run the
-        model on, and the list of masking matrices. These parameters
-        should be passed directly to `compress_serialisation`.
-    """
-    lens = list(map(len, seqs))
-    # pad the sequences, which simultaneously gives us
-    # the initial `keep` state:
-    seqs, keep = padded_batch(seqs, pad_value, min_length=min_length)
-
-    # special start/end tokens must be kept if the caller indicates:
-    if keep_start_end:
-        keep[:, 0] = 0
-        keep[[i for i in range(len(lens))], [L - 1 for L in lens]] = 0
-
-    mask_arrays = [keep]
-
-    # repeat until everything is unmasked:
-    while not np.all(mask_arrays[-1] == 0):
-        # only kept around for assertion checking
-        old_keep = keep
-
-        # run next B&B operation, then compute the
-        # resulting `keep` state:
-        keep = np.where(solve_mask(
-            model, ent_bud, seqs, keep,
-            mask_value, seqs.shape[0]
-        ) == mask_value, 1, 0)
-
-        # if we did not manage to keep any more than last
-        # iteration, perhaps because the entropy budget is
-        # too high, we MUST change `keep` to prevent a fixed
-        # point (hence infinite loop).
-        # rather than error, setting `keep` to all-zeroes
-        # will terminate the function, which is better than
-        # asking the user to exit the program and re-run
-        # with a smaller entropy budget!
-        if not np.any(keep < old_keep):
-            keep = np.zeros_like(keep)
-
-        # the progress must be monotonic:
-        assert(np.all(keep <= old_keep))
-
-        # store the new `keep` state:
-        mask_arrays.append(keep)
-
-    return seqs, np.stack(mask_arrays)
 
 
 def serialise_cutting_sort(model, seqs, mask_value, pad_value,
