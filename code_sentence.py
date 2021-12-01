@@ -8,7 +8,7 @@ import argparse as ap
 import numpy as np
 import tensorflow as tf
 from transformers import BertTokenizer, TFBertForMaskedLM
-from compressors.bnb_compression import (serialise_bnb, compress_serialisation, serialise_greedy,
+from compressors.bnb_compression import (compress_serialisation, serialise_greedy,
                                          serialise_l2r, serialise_cutting_sort)
 
 
@@ -21,7 +21,6 @@ pad_value = tokenizer._convert_token_to_id(tokenizer.pad_token)
 if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("text", type=str, help="The text to apply to.")
-    parser.add_argument("ent_bud", type=float, help="Entropy budget.")
     args = parser.parse_args()
 
     encoded_input = tokenizer(args.text, return_tensors='np')
@@ -39,16 +38,6 @@ if __name__ == "__main__":
         ).logits, axis=-1).numpy()
         return ps
 
-    results = serialise_bnb(_model, seqs, mask_value, pad_value, args.ent_bud,
-                            keep_start_end=True)
-    bnb_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
-    printable_results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
-
-    print("B&B REVEAL ORDER")
-    for seq in printable_results[:, 0, :]:
-        print(tokenizer.convert_tokens_to_string(
-            map(tokenizer._convert_id_to_token, seq)))
-
     results = serialise_l2r(seqs, pad_value)
     l2r_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
 
@@ -56,7 +45,7 @@ if __name__ == "__main__":
     cut_codes = compress_serialisation(_model, results[0], results[1], mask_value, 2)
     printable_results = np.where(results[1] == 1, mask_value, results[0][np.newaxis, :, :])
 
-    print("CUT REVEAL ORDER")
+    print("CUTTING SORT REVEAL ORDER")
     for seq in printable_results[:, 0, :]:
         print(tokenizer.convert_tokens_to_string(
             map(tokenizer._convert_id_to_token, seq)))
@@ -70,9 +59,6 @@ if __name__ == "__main__":
         print(tokenizer.convert_tokens_to_string(
             map(tokenizer._convert_id_to_token, seq)))
 
-    print("BNB Code:", "".join(map(str, bnb_codes[0])))
-    print("Cutting Code:", "".join(map(str, cut_codes[0])))
-    print("Greedy Code:", "".join(map(str, greedy_codes[0])))
     print("Code lengths:")
-    print("BNB =", len(bnb_codes[0]), ", L2R =", len(l2r_codes[0]),
-          "Cut =", len(cut_codes[0]), "Greedy =", len(greedy_codes[0]))
+    print("L2R =", len(l2r_codes[0]),
+          "Cutting-sort =", len(cut_codes[0]), "Greedy =", len(greedy_codes[0]))
