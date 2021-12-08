@@ -97,6 +97,19 @@ CREATE TABLE Compressors(
     comprepeat INTEGER NOT NULL DEFAULT 0,
     compdate TEXT NOT NULL,  -- date time of script invocation for creating this compressor
 
+    -- the amount of time training took (Close to 0 for compressors 
+    -- which do not require training. However, this may not actually
+    -- be 0 in such cases, so do *not* rely on it being 0 for, say,
+    -- standard compression algorithms which do not train.)
+    -- WARNING: for models which have already been trained, this only
+    -- counts the time it takes to load the model from a file! Thus
+    -- you probably want to argmax over all models from a fixed training
+    -- configuration to account for this.
+    comp_train_time REAL NULL,
+
+    -- the amount of time required to compress the whole dataset.
+    comp_compress_time REAL NULL,
+
     UNIQUE(compname, comprepeat)
 );
 

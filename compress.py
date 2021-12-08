@@ -10,6 +10,7 @@ NOTE: might want auxiliary data like the chosen BERT masking procedure
 
 
 import os
+import time
 import datetime
 import argparse as ap
 import sqlite3 as sql
@@ -170,7 +171,10 @@ if __name__ == "__main__":
         args.model_data_dir, compname, comprepeat,
         mask_value=mask_value, pad_value=pad_value,
         **config)
+
+    train_time_before = time.perf_counter()
     compd = comp.train(alphabet_size, iter_train, iter_val)
+    train_time_after = time.perf_counter()
 
     # SAVE THE COMPRESSOR'S METADATA
 
@@ -190,14 +194,18 @@ if __name__ == "__main__":
             [(compname, k, v) for k, v in config.items()]
         )
     # insert compressor instance
-    cur.execute("INSERT INTO Compressors(compid, compname, comprepeat, compdate) "
-                "VALUES (?, ?, ?, ?)",
-                (compid, compname, comprepeat, compdate))
+    cur.execute("""
+        INSERT INTO Compressors(compid, compname, comprepeat,
+                                compdate, comp_train_time)
+        VALUES (?, ?, ?, ?, ?)""",
+        (compid, compname, comprepeat, compdate,
+         float(train_time_after - train_time_before)))
 
     # RUN THE COMPRESSOR ON THE ENTIRE DATASET, SAVE THE RESULTING COMPRESSION SIZES
 
     print("Compressing dataset...")
 
+    compress_time_before = time.perf_counter()
     cur.executemany(
         "INSERT INTO CompressionSizes(compid, seqid, compsz) VALUES (?, ?, ?)",
         pgb.progressbar(
@@ -206,6 +214,11 @@ if __name__ == "__main__":
                 zip(comp.compressmany(iter_all()), iterate_over_all())
             )
         ))
+    compress_time_after = time.perf_counter()
+
+    cur.execute(
+        "UPDATE Compressors SET comp_compress_time = ? WHERE compid = ?",
+        (compress_time_after - compress_time_before, compid))
 
     db.commit()
     db.close()
