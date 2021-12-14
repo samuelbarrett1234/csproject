@@ -71,7 +71,8 @@ class BERT(Compressor):
                  mask_value=None, pad_value=None,
                  batch_sz_train=32, batch_sz_comp=8,
                  max_len_train=128, max_len_comp=512,
-                 blocking=16, num_epochs=4, learning_rate=1.0e-3,
+                 blocking=16, chunking=1, num_epochs=4,
+                 learning_rate=1.0e-3,
                  train_repeat=0, out_alphabet_sz=2,
                  reverse_order=False, masking_prop=0.5):
         """Create a BERT compressor model.
@@ -116,6 +117,7 @@ class BERT(Compressor):
         self.max_len_train = max_len_train
         self.max_len_comp = max_len_comp
         self.blocking = blocking
+        self.chunking = chunking
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.masking_prop = masking_prop
@@ -257,7 +259,7 @@ class BERT(Compressor):
 
         codes = bnb_compression.compress_serialisation(
             self._call_model, seqs, mask_arrays, self.mask_value,
-            self._out_alphabet_sz
+            self._out_alphabet_sz, chunking=self.chunking
         )
         return codes
 

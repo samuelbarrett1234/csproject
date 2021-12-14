@@ -210,7 +210,8 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
     return seqs, _block_mask_arrays(mask_arrays, blocking)
 
 
-def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
+def compress_serialisation(model, seqs, mask_arrays, mask_value, d,
+                           chunking=1):
     """Given a batch of sequences, and an order in which to compress them,
     perform that compression.
 
@@ -234,6 +235,14 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
                                   satisfies rules as explained above.
         mask_value (int): The index corresponding to the masking value.
         d (int): The arity of the output.
+        chunking (int): Call the model once every `chunking`th token. Higher
+                        values will result in less efficient codes, but the
+                        speedup is of the order of the chunking value.
+                        Warning: this operates ON TOP OF any chunking already
+                        done in the masks. In other words, it chunks the
+                        masks, rather than the tokens. Ignore this warning if
+                        your masks are unmodified return values from
+                        any serialise method that returns an actual ordering.
 
     Returns:
         List of Lists of Ints: Returns the d-ary Huffman codes for each sequence
@@ -244,6 +253,7 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
     codes = [[] for i in range(seqs.shape[0])]
     last_seqs = None
     last_masks = None
+    chunk = 0
     for masks in mask_arrays:
         if last_seqs is not None:
             # compute which new tokens are being revealed at this
@@ -253,9 +263,15 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d):
             # (note that the number of revealed tokens may be different
             # for different sequences)
 
-            # run the model to get its current belief over masked
-            # sequences:
-            ps = model(last_seqs)
+            # only update the model every `chunking`th
+            # token (but obviously it is crucial to call
+            # this the first time `_compute_joint_code`
+            # is called, because this sets up `ps`.)
+            if chunk % chunking == 0:
+                # run the model to get its current belief over masked
+                # sequences:
+                ps = model(last_seqs)
+            chunk += 1
 
             # now, for each sequence, compute the Huffman code of the
             # joint distribution of the revealed tokens, and add it
