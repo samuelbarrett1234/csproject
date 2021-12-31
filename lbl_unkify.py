@@ -54,7 +54,7 @@ if __name__ == "__main__":
     # from the input label type to our new label type
     cur.execute("""
     INSERT INTO LabelDictionary(lbltype, lbl, lblval)
-    SELECT ?, ROW_NUMBER() OVER (ORDER BY COUNT(seqid) DESC) - 1, lblval
+    SELECT ?, ROW_NUMBER() OVER (ORDER BY COUNT(seqid) DESC) - 1), lblval
     FROM Labels NATURAL JOIN LabelTypes NATURAL JOIN LabelDictionary
     WHERE lbltype_name = ?
     GROUP BY lbl, lblval
