@@ -53,14 +53,19 @@ if __name__ == "__main__":
     # copy over the `args.n` most frequently occurring labels
     # from the input label type to our new label type
     cur.execute("""
-    INSERT INTO LabelDictionary(lbltype, lbl, lblval)
-    SELECT ?, ROW_NUMBER() OVER (ORDER BY COUNT(seqid) DESC) - 1), lblval
+    SELECT ?, lblval
     FROM Labels NATURAL JOIN LabelTypes NATURAL JOIN LabelDictionary
     WHERE lbltype_name = ?
     GROUP BY lbl, lblval
     ORDER BY COUNT(seqid) DESC
     LIMIT ?
     """, (next_lbltype_id, args.lbltype_name, args.n))
+    cur2 = db.cursor()
+    for i, lblval in enumerate(cur.fetchall()):
+        cur2.execute("""
+        INSERT INTO LabelDictionary(lbltype, lbl, lblval)
+        VALUES (?, ?, ?)
+        """, (next_lbltype_id, i, lblval[0]))
 
     # when inserting the new UNK character, what will its ID be?
     cur.execute("SELECT MAX(lbl) + 1 FROM LabelDictionary "
