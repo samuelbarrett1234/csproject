@@ -106,10 +106,12 @@ if __name__ == "__main__":
     )
 
     SELECT seqid, ?, lbl_new
-    FROM Labels JOIN LabelMapping
-    ON Labels.lbl = LabelMapping.lbl_old
+    FROM Labels NATURAL JOIN LabelTypes
+    JOIN LabelMapping ON Labels.lbl = LabelMapping.lbl_old
+    WHERE lbltype_name = ?
     """, (args.lbltype_name, next_lbltype_id, unk_id,
-          args.lbltype_name, next_lbltype_id, next_lbltype_id))
+          args.lbltype_name, next_lbltype_id,
+          next_lbltype_id, args.lbltype_name))
 
     cur.execute("COMMIT")
     db.commit()
