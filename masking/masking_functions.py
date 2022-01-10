@@ -114,7 +114,7 @@ def cut_sort_masking(model, seqs, pad_value, mask_value, alphabet_size,
         # by the initial keep set
         cut_sorted_idxs = idxs[i, init_keep[i, idxs[i]] == 1]
         # mask approximately the first half of these
-        cut_sorted_idxs = cut_sorted_idxs[:int(len(cut_sorted_idxs) * prop)]
+        cut_sorted_idxs = cut_sorted_idxs[-int(len(cut_sorted_idxs) * prop):]
         # now we have the indices to mask!
         mask[i, cut_sorted_idxs] = True
 
@@ -139,7 +139,7 @@ def greedy_masking(model, seqs, pad_value, mask_value, alphabet_size,
         # by the initial keep set
         cut_sorted_idxs = idxs[i, init_keep[i, idxs[i]] == 1]
         # mask approximately the first half of these
-        cut_sorted_idxs = cut_sorted_idxs[:int(len(cut_sorted_idxs) * prop)]
+        cut_sorted_idxs = cut_sorted_idxs[-int(len(cut_sorted_idxs) * prop):]
         # now we have the indices to mask!
         mask[i, cut_sorted_idxs] = True
 
