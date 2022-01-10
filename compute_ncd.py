@@ -50,11 +50,14 @@ if __name__ == "__main__":
     cur1.execute("PRAGMA FOREIGN_KEYS = ON")
 
     cur1.execute("""
-    SELECT XY.compsz AS xy_compsz, X.compsz AS x_compsz, Y.compsz AS y_compsz,
-    seqid_out AS seqid, XY.compid
-    FROM SequencePairings AS SP JOIN CompressionSizes AS XY ON SP.seqid_out = XY.seqid
-    JOIN CompressionSizes AS X ON XY.compid = X.compid AND SP.seqid_left = X.seqid
-    JOIN CompressionSizes AS Y ON XY.compid = Y.compid AND SP.seqid_right = Y.seqid
+    SELECT (XY.compsz + YX.compsz) / 2.0 AS xy_compsz, X.compsz AS x_compsz, Y.compsz AS y_compsz,
+    SP1.seqid_out AS seqid, XY.compid
+    FROM SequencePairings AS SP1 JOIN SequencePairings AS SP2
+    ON SP1.seqid_left = SP2.seqid_right AND SP1.seqid_right = SP2.seqid_left
+    JOIN CompressionSizes AS XY ON SP1.seqid_out = XY.seqid
+    JOIN CompressionSizes AS YX ON SP2.seqid_out = YX.seqid AND XY.compid = YX.compid
+    JOIN CompressionSizes AS X ON XY.compid = X.compid AND SP1.seqid_left = X.seqid
+    JOIN CompressionSizes AS Y ON XY.compid = Y.compid AND SP1.seqid_right = Y.seqid
     """)
 
     cur2 = db.cursor()
