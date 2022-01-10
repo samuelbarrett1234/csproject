@@ -147,7 +147,9 @@ class BERT(Compressor):
     def _call_model(self, xs):
         assert (self._model_obj is not None)
         return tf.nn.softmax(self._model_obj(
-            input_ids=xs
+            input_ids=xs,
+            # don't attend to padding tokens:
+            attention_mask=np.where(xs == self.pad_value, 0, 1)
         ).logits, axis=-1).numpy()
 
 
