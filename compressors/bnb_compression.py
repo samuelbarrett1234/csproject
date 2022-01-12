@@ -29,6 +29,22 @@ def _block_mask_arrays(mask_arrays, blocking):
     return mask_arrays[rng]
 
 
+def _keep_start_end(seqs, init_keep):
+    """Add the start/end/separation symbols to the initial
+    keep set. This is important, as models are allowed to
+    condition on such information for free.
+    """
+    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
+    sep_symbol = seqs[0, seq_lens[0] - 1]
+    start_symbol = seqs[0, 0]
+    # condition on ALL occurrences of the special symbols!
+    # typically they will only appear at the start and end
+    # of each sequence, but for paired sequences they also
+    # appear in the middle
+    init_keep = np.where(np.logical_or(seqs == start_symbol, seqs == sep_symbol), 0, init_keep)
+    return init_keep
+
+
 def serialise_l2r(seqs, pad_value,
                   keep_start_end=False,
                   min_length=None,
@@ -58,11 +74,9 @@ def serialise_l2r(seqs, pad_value,
         model on, and the list of masking matrices. These parameters
         should be passed directly to `compress_serialisation`.
     """
-    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
     seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
     if keep_start_end:
-        init_keep[:, 0] = 0
-        init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
+        init_keep = _keep_start_end(seqs, init_keep)
 
     mask_arrays = np.zeros((seqs.shape[1] + 1, seqs.shape[0], seqs.shape[1]), dtype=np.int32)
     mask_arrays[0] = init_keep
@@ -112,11 +126,9 @@ def serialise_cutting_sort(model, seqs, mask_value, pad_value,
         model on, and the list of masking matrices. These parameters
         should be passed directly to `compress_serialisation`.
     """
-    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
     seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
     if keep_start_end:
-        init_keep[:, 0] = 0
-        init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
+        init_keep = _keep_start_end(seqs, init_keep)
 
     n_mask_arrays = seqs.shape[1] + 1
     if keep_start_end:
@@ -180,11 +192,9 @@ def serialise_greedy(model, seqs, mask_value, pad_value,
         model on, and the list of masking matrices. These parameters
         should be passed directly to `compress_serialisation`.
     """
-    seq_lens = np.array(list(map(len, seqs)), dtype=np.int32)
     seqs, init_keep = padded_batch(seqs, pad_value, min_length=min_length)
     if keep_start_end:
-        init_keep[:, 0] = 0
-        init_keep[np.arange(0, seqs.shape[0], dtype=np.int32), seq_lens - 1] = 0
+        init_keep = _keep_start_end(seqs, init_keep)
 
     n_mask_arrays = seqs.shape[1] + 1
     if keep_start_end:
