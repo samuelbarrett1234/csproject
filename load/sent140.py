@@ -112,6 +112,14 @@ if __name__ == "__main__":
             except UnicodeEncodeError:
                 print("Warning: non-UTF-8 characters encountered on line", i, ", skipping...")
                 continue
+
+            # compute sequence values
+            seq = tokenizer(preprocess_tweet(row[-1]))['input_ids']
+
+            # reject sequences with <5 tokens (these are normally silly; also
+            # don't forget that two of the tokens are start/end symbols!)
+            if len(seq) < 5:
+                continue
             
             # 80/10/10 data split
             if i % 10 < 8:
@@ -137,8 +145,8 @@ if __name__ == "__main__":
                     VALUES (?, ?, ?)
                 """, (seqid, lbl_type_ids.at(lbl_type), lbl_types[lbl_type].at(lbl)))
 
-            # compute and save the sequence values:
-            for j, s in enumerate(tokenizer(preprocess_tweet(row[-1]))['input_ids']):
+            # save the sequence values:
+            for j, s in enumerate(seq):
                 cur.execute("""
                     INSERT INTO SequenceValues(seqid, svidx, tokid)
                     VALUES (?, ?, ?)
