@@ -147,8 +147,7 @@ def get_evaluation_sequences_with_k(lbltype, k):  # pick `k` train samples for e
                 db, 0, lbltype, subsample_top_k(k)
             ))
         )
-        # make sure to select ORDERED PAIRS of such sequences
-        # (hence the "UNION ALL".)
+        # make sure to yield all ORDERED PAIRS of such sequences
         cur.execute("""
             SELECT A.seqid, B.seqid, B.seqpart
             FROM ChosenSeqs1 AS A JOIN Sequences AS B
@@ -213,7 +212,7 @@ def get_random_train_pairing(db):
             yield(seqid2, seqid1, 0)
 
 
-def get_val_seq_lbl_matrix(lbltype, k):  # pick `k` val samples for each label in `lbltype`
+def get_val_seq_lbl_matrix(lbltype, k):  # pick `k` *val seqs* for each label in `lbltype` for pairing
     def f(db):
         SEQPART = 1
         cur = db.cursor()
@@ -224,8 +223,7 @@ def get_val_seq_lbl_matrix(lbltype, k):  # pick `k` val samples for each label i
                 db, SEQPART, lbltype, subsample_top_k(k)
             ))
         )
-        # make sure to select ORDERED PAIRS of such sequences
-        # (hence the "UNION ALL".)
+        # make sure to yield all ORDERED PAIRS of such sequences
         cur.execute("""
             SELECT A.seqid, B.seqid
             FROM ChosenSeqs2 AS A JOIN Sequences AS B
@@ -298,7 +296,7 @@ if __name__ == "__main__":
                 get_reflexive_sequences(db),
                 get_cyclic_shift_train_pairing(db),
                 get_random_train_pairing(db),
-                get_val_seq_lbl_matrix(args.lbltype, args.k)(db),
+                #get_val_seq_lbl_matrix(args.lbltype, args.k)(db),
                 get_evaluation_sequences_with_k(args.lbltype, args.k)(db),
             )
         ),
