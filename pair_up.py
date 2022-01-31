@@ -119,7 +119,7 @@ def lbl_subsample(db, seqpart, lbltype, subsampler):
     for lbl in map(lambda t: t[0], cur1.fetchall()):
         cur2.execute("SELECT seqid FROM Sequences NATURAL JOIN Labels "
                      "NATURAL JOIN LabelTypes WHERE lbltype_name = ? "
-                     "AND lbl = ? AND seqpart = ?",
+                     "AND lbl = ? AND seqpart = ? AND seq_is_pair = 0",
                      (lbltype, lbl, seqpart))
         for seqid in subsampler(map(lambda t: t[0], cur2.fetchall())):
             yield seqid

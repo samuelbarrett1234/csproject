@@ -6,6 +6,7 @@ sequences will have the same label.)
 """
 
 
+from bisect import bisect_left
 import re
 import io
 import os
@@ -68,6 +69,11 @@ if __name__ == "__main__":
                         help="Path to the sentiment140 CSV file.")
     parser.add_argument("--limit", default=None, type=int,
                         help="Limit the total size of the dataset.")
+    parser.add_argument("--split", type=str, default='80,90,100',
+                        help="A list of length three whose elements "
+                             "are nondecreasing. The first element is "
+                             "the number of train, the second is train "
+                             "plus val, the third is train, val and test.")
     args = parser.parse_args()
 
     if os.path.isfile(args.db):
@@ -76,6 +82,11 @@ if __name__ == "__main__":
 
     if not os.path.isfile(args.sent140):
         print("Error: ", args.sent140, "does not exist.")
+        exit(-1)
+
+    args.split = list(map(int, args.split.split(',')))
+    if any([i > j for i, j in zip(args.split[:2], args.split[1:])]):
+        print("Split list must be nondecreasing.")
         exit(-1)
 
     create_db_sql = os.path.join(os.path.dirname(sys.argv[0]), "../", "create_db.sql")
@@ -120,14 +131,9 @@ if __name__ == "__main__":
             # don't forget that two of the tokens are start/end symbols!)
             if len(seq) < 5:
                 continue
-            
-            # 80/10/10 data split
-            if i % 10 < 8:
-                split = 0  # train
-            elif i % 10 == 8:
-                split = 1  # val
-            else:
-                split = 2  # test
+
+            split = bisect_left(args.split, i % args.split[-1])
+            assert(split < 3 and split >= 0)
 
             # save an entry for the sequence itself:
             cur.execute("""
