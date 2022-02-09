@@ -35,7 +35,8 @@ COMPRESSORS = {
     'bert': lambda data_dir, name, rep, **kwargs: comp.BERT(
         data_dir, name, train_repeat=rep, out_alphabet_sz=256,  # byte
         **kwargs
-    )
+    ),
+    'huffman': lambda data_dir, name, rep, **kwargs: comp.Huffman(256)
 }
 
 
