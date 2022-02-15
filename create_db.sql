@@ -59,6 +59,7 @@ CREATE TABLE Labels(
 );
 
 CREATE INDEX lbl_idx ON Labels(lbl, seqid);
+CREATE INDEX lbl_idx_2 ON Labels(seqid, lbltype);
 
 CREATE TABLE SequencePairings(
     -- INVARIANT: `seqid_out.seq_is_pair = 1`,
