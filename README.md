@@ -23,10 +23,8 @@ You must also use `--squash-start-end` for NLP BERT-tokenised data.
 It applies the compressor to all of the data in the DB.
 Some compressors have to train first, like the BERT compressor.
 - Once you have invoked the relevant compressors, `compute_ncd.py` will use the compressibilities achieved to compute all of the different NCD similarities we are interested in.
-- Once the similarities are computed, `classify.py` uses all of the different classification methods (e.g. 1-NN) to assign label distributions to the sequences.
-- Once the classifications have been performed, `results.py` collects the results together and outputs it to a CSV file, but also storing in the DB.
-- While you can analyse the results by hand, the script `check_hypotheses.py` does this in an automated fashion.
-It also outputs its findings to CSV.
+- Once the similarities are computed, `classify.py` can be used to make classifications (you input the type of classifier you want to use).
+- Then, `compute_accs.py` computes the accuracies of each prediction method.
 
 ## What to expect
 

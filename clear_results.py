@@ -33,6 +33,7 @@ if __name__ == "__main__":
     cur.execute("DELETE FROM NCDValues")
     cur.execute("DELETE FROM Predictions")
     cur.execute("DELETE FROM LabelScores")
+    cur.execute("DELETE FROM ResultAccuracies")
 
     db.commit()
     db.close()

@@ -142,30 +142,19 @@ CREATE TABLE Predictions(
 );
 
 
-CREATE VIEW ResultAccuracies AS
-WITH PredVsTrue AS (
-    SELECT Predictions.lbltype, compid, predictor, ncd_formula, seqpart,
-    CASE WHEN Predictions.lbl = Labels.lbl THEN 1.0 ELSE 0.0 END AS correct
-    FROM Predictions NATURAL JOIN Sequences
-    JOIN Labels ON Labels.seqid = Predictions.seqid AND Labels.lbltype = Predictions.lbltype
-),
-Train AS (
-    SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS train_acc
-    FROM PredVsTrue WHERE seqpart = 0 GROUP BY lbltype, compid, predictor, ncd_formula
-),
-Val AS (
-    SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS val_acc
-    FROM PredVsTrue WHERE seqpart = 1 GROUP BY lbltype, compid, predictor, ncd_formula
-),
-Test AS (
-    SELECT lbltype, compid, predictor, ncd_formula, AVG(correct) AS test_acc
-    FROM PredVsTrue WHERE seqpart = 2 GROUP BY lbltype, compid, predictor, ncd_formula
-)
-SELECT * FROM Train NATURAL JOIN Val NATURAL JOIN Test;
+CREATE TABLE ResultAccuracies(
+    lbltype INTEGER NOT NULL,
+    compid INTEGER NOT NULL,
+    predictor TEXT NOT NULL,
+    ncd_formula TEXT NOT NULL,
+    val_acc REAL NOT NULL,
+    test_acc REAL NOT NULL,
+    PRIMARY KEY(lbltype, compid, predictor, ncd_formula)
+);
 
 
 CREATE VIEW BestCompPredMethod AS
-SELECT lbltype, compid, predictor, ncd_formula, MAX(val_acc) AS unused_val_acc
+SELECT lbltype, compid, predictor, ncd_formula, MAX(val_acc) AS val_acc, test_acc
 FROM ResultAccuracies
 GROUP BY lbltype, compid;
 
