@@ -106,15 +106,16 @@ if __name__ == "__main__":
     cur.execute("PRAGMA DEFER_FOREIGN_KEYS = ON")
 
     seqid = 0
+    split = 0
     lbl_types = {}
     lbl_type_ids = Alphabet()
     with io.open(args.sent140, mode="r", encoding="latin-1") as f:
         csvf = csv.reader(f)
-        for i, row in pgb.progressbar(enumerate(csvf)):
+        for row in pgb.progressbar(csvf):
             # limit cutoff, if applicable
             # WARNING: this assumes the file is sorted, NOT ordered
             # on the label, as it is by default!
-            if args.limit is not None and i >= args.limit:
+            if args.limit is not None and seqid >= args.limit:
                 break
 
             # reject strings with non acsii characters
@@ -132,8 +133,10 @@ if __name__ == "__main__":
             if len(seq) < 5:
                 continue
 
-            split = bisect_left(args.split, i % args.split[-1])
-            assert(split < 3 and split >= 0)
+            # put row `i` into the correct split:
+            if seqid % args.split[-1] >= args.split[split] - 1:
+                split += 1
+                split %= len(args.split)
 
             # save an entry for the sequence itself:
             cur.execute("""
