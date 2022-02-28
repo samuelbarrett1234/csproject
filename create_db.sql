@@ -55,6 +55,7 @@ CREATE TABLE Labels(
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
     lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype) ON DELETE CASCADE,
     lbl INTEGER NOT NULL,
+    PRIMARY KEY (lbltype, seqid),
     FOREIGN KEY (lbltype, lbl) REFERENCES LabelDictionary(lbltype, lbl)
 );
 
@@ -129,6 +130,34 @@ CREATE TABLE NCDValues(
     ncd_value REAL NOT NULL,
     PRIMARY KEY(ncd_formula, compid, seqid)
 );
+
+CREATE TABLE TrainingPairings (
+    lbltype INTEGER NOT NULL,
+    ncd_formula TEXT NOT NULL,
+    compid INTEGER NOT NULL,
+    seqid_train INTEGER NOT NULL,
+    seqid_other INTEGER NOT NULL,
+    lbl INTEGER NOT NULL,
+    ncd_value REAL NOT NULL,
+    PRIMARY KEY (lbltype, compid, ncd_formula, seqid_other, seqid_train),
+    FOREIGN KEY (lbltype, seqid_train) REFERENCES Labels(lbltype, seqid),
+    FOREIGN KEY (lbltype, lbl) REFERENCES LabelDictionary(lbltype, lbl)
+);  /*This table is computed by the following query and acts as a materialised view:
+
+SELECT seqid_left AS seqid_train, seqid_right AS seqid_other,
+lbltype, lbl, ncd_formula, ncd_value, compid
+FROM SequencePairings JOIN Sequences ON seqid_left = Sequences.seqid
+JOIN NCDValues ON seqid_out = NCDValues.seqid
+JOIN Labels ON Sequences.seqid = Labels.seqid
+WHERE Sequences.seqpart = 0
+UNION
+SELECT seqid_right AS seqid_train, seqid_left AS seqid_other,
+lbltype, lbl, ncd_formula, ncd_value, compid
+FROM SequencePairings JOIN Sequences ON seqid_right = Sequences.seqid
+JOIN NCDValues ON seqid_out = NCDValues.seqid
+JOIN Labels ON Sequences.seqid = Labels.seqid
+WHERE Sequences.seqpart = 0
+*/
 
 CREATE TABLE Predictions(
     -- INVARIANT: `seqid.seq_is_pair = 0`

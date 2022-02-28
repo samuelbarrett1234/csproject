@@ -89,22 +89,7 @@ def execute(db, predictor, predictor_name):
 
     try:
         cur.execute("""
-        WITH TrainingPairings AS (
-            SELECT seqid_left AS seqid_train, seqid_right AS seqid_other,
-            lbltype, lbl, ncd_formula, ncd_value, compid
-            FROM SequencePairings JOIN Sequences ON seqid_left = Sequences.seqid
-            JOIN NCDValues ON seqid_out = NCDValues.seqid
-            JOIN Labels ON Sequences.seqid = Labels.seqid
-            WHERE Sequences.seqpart = 0
-            UNION
-            SELECT seqid_right AS seqid_train, seqid_left AS seqid_other,
-            lbltype, lbl, ncd_formula, ncd_value, compid
-            FROM SequencePairings JOIN Sequences ON seqid_right = Sequences.seqid
-            JOIN NCDValues ON seqid_out = NCDValues.seqid
-            JOIN Labels ON Sequences.seqid = Labels.seqid
-            WHERE Sequences.seqpart = 0
-        ),
-        Labellings AS (
+        WITH Labellings AS (
             SELECT seqid_other AS seqid, lbltype, ncd_formula, compid,
             CLASSIFY(lbl, ncd_value) AS lbl
             FROM TrainingPairings
