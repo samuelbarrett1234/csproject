@@ -5,6 +5,7 @@ this script uses different classification methods to classify the labels.
 
 
 import os
+import math
 import heapq
 import argparse as ap
 import sqlite3 as sql
@@ -50,51 +51,71 @@ class KNNClassificationAggregator:
                 return lbl
 
 
-def knn(db, k):
+class AvgDistClassificationAggregator:
+    """An SQLite aggregation function for classifying
+    points based on their average distance.
+    """
+    def __init__(self, log=True):
+        self.log = log
+        self.data = {}  # mapping from labels to NCD distances
+
+    def step(self, lbl, dist):
+        if self.log:
+            dist = math.log(max(dist, 1.0e-9))
+
+        if lbl not in self.data:
+            self.data[lbl] = []
+
+        self.data[lbl].append(dist)
+
+    def finalize(self):
+        try:
+            self.data = dict([
+                (lbl, sum(vs) / len(vs)) for lbl, vs in self.data.items()
+            ])
+            # return lowest avg
+            min_v = min(self.data.values())
+            for lbl, v in self.data.items():
+                if v == min_v:
+                    return lbl
+        finally:
+            self.data = {}  # reset
+
+
+def execute(db, predictor, predictor_name):
     cur = db.cursor()
-    db.create_aggregate("KNN_CLASSIFY", 2,
-                        lambda: KNNClassificationAggregator(k))
+    db.create_aggregate("CLASSIFY", 2,
+                        predictor)
 
     try:
         cur.execute("""
-        WITH TrainingPairings AS (
-            SELECT seqid_left AS seqid_train, seqid_right AS seqid_other,
-            lbltype, lbl, ncd_formula, ncd_value, compid
-            FROM SequencePairings JOIN Sequences ON seqid_left = Sequences.seqid
-            JOIN NCDValues ON seqid_out = NCDValues.seqid
-            JOIN Labels ON Sequences.seqid = Labels.seqid
-            WHERE Sequences.seqpart = 0
-            UNION
-            SELECT seqid_right AS seqid_train, seqid_left AS seqid_other,
-            lbltype, lbl, ncd_formula, ncd_value, compid
-            FROM SequencePairings JOIN Sequences ON seqid_right = Sequences.seqid
-            JOIN NCDValues ON seqid_out = NCDValues.seqid
-            JOIN Labels ON Sequences.seqid = Labels.seqid
-            WHERE Sequences.seqpart = 0
-        ),
-        Labellings AS (
+        WITH Labellings AS (
             SELECT seqid_other AS seqid, lbltype, ncd_formula, compid,
-            KNN_CLASSIFY(lbl, ncd_value) AS lbl
+            CLASSIFY(lbl, ncd_value) AS lbl
             FROM TrainingPairings
             GROUP BY seqid_other, lbltype, ncd_formula, compid
         )
-        SELECT lbltype, ncd_formula, compid, seqid, lbl
+        SELECT ?, lbltype, ncd_formula, compid, seqid, lbl
         FROM Labellings
-        """)
-        for row in cur.fetchall():
-            yield row
+        """, (predictor_name,))
+        return cur.fetchall()
 
     finally:
         # to clean up, delete the aggregation function
-        db.create_aggregate("KNN_CLASSIFY", 2, None)
+        db.create_aggregate("CLASSIFY", 2, None)
 
 
 if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("db", type=str,
                         help="Filename of the DB to load.")
-    parser.add_argument("k", type=int,
-                        help="The value of k for the KNN classifier.")
+    grp = parser.add_mutually_exclusive_group(required=True)
+    grp.add_argument("--knn", type=int, default=None,
+                     help="KNN classifier, with given integer K.")
+    grp.add_argument("--avg", action='store_true',
+                     help="Choose label based on the class with smallest average distance.")
+    grp.add_argument("--avg-log", action='store_true',
+                     help="Choose label based on the class with smallest average log-distance.")
     args = parser.parse_args()
 
     if not os.path.isfile(args.db):
@@ -103,12 +124,16 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
 
-    PREDICTOR_NAME = str(args.k) + "-NN"
-    PREDICTOR = lambda db: knn(db, args.k)
-
-    def apply():
-        for row in PREDICTOR(db):
-            yield (PREDICTOR_NAME,) + row
+    # construct the predictor
+    if args.knn is not None:
+        PREDICTOR_NAME = str(args.knn) + "-NN"
+        PREDICTOR = lambda: KNNClassificationAggregator(args.knn)
+    elif args.avg:
+        PREDICTOR_NAME = 'AVG'
+        PREDICTOR = lambda: AvgDistClassificationAggregator(log=False)
+    elif args.avg_log:
+        PREDICTOR_NAME = 'AVG-LOG'
+        PREDICTOR = lambda: AvgDistClassificationAggregator(log=True)
 
     cur = db.cursor()
     cur.execute("PRAGMA FOREIGN_KEYS = ON")
@@ -116,7 +141,7 @@ if __name__ == "__main__":
     INSERT INTO Predictions(predictor, lbltype, ncd_formula, compid, seqid, lbl)
     VALUES (?, ?, ?, ?, ?, ?)
     """,
-    pgb.progressbar(apply())
+    pgb.progressbar(execute(db, PREDICTOR, PREDICTOR_NAME))
     )
 
     db.commit()
