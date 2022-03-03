@@ -159,6 +159,8 @@ JOIN Labels ON Sequences.seqid = Labels.seqid
 WHERE Sequences.seqpart = 0
 */
 
+CREATE INDEX TrainPairOtherIndex ON TrainingPairings(lbltype, compid, ncd_formula, seqid_train, seqid_other);
+
 CREATE TABLE Predictions(
     -- INVARIANT: `seqid.seq_is_pair = 0`
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
