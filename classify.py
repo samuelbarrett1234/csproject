@@ -82,6 +82,38 @@ class AvgDistClassificationAggregator:
             self.data = {}  # reset
 
 
+class QuantileClassificationAggregator:
+    """An SQLite aggregation function for classifying
+    points based on a quantile distance between the
+    distance distributions. Lower quantile values mean
+    comparisons closer to the minimum.
+    """
+    def __init__(self, quantile):
+        quantile = float(quantile)
+        assert(quantile >= 0.0 and quantile < 1.0)
+        self.quantile = quantile
+        self.data = {}  # mapping from labels to NCD distances
+
+    def step(self, lbl, dist):
+        if lbl not in self.data:
+            self.data[lbl] = []
+
+        self.data[lbl].append(dist)
+
+    def finalize(self):
+        try:
+            self.data = dict([
+                (lbl, sorted(vs)[int(self.quantile * len(vs))]) for lbl, vs in self.data.items()
+            ])
+            # return class associated with the lowest quantile
+            min_v = min(self.data.values())
+            for lbl, v in self.data.items():
+                if v == min_v:
+                    return lbl
+        finally:
+            self.data = {}  # reset
+
+
 def execute(db, predictor, predictor_name):
     cur = db.cursor()
     db.create_aggregate("CLASSIFY", 2,
@@ -112,6 +144,8 @@ if __name__ == "__main__":
     grp = parser.add_mutually_exclusive_group(required=True)
     grp.add_argument("--knn", type=int, default=None,
                      help="KNN classifier, with given integer K.")
+    grp.add_argument("--quantile", type=float, default=None,
+                     help="Quantile classifier, with given quantile (smaller means closer to min).")
     grp.add_argument("--avg", action='store_true',
                      help="Choose label based on the class with smallest average distance.")
     grp.add_argument("--avg-log", action='store_true',
@@ -128,6 +162,9 @@ if __name__ == "__main__":
     if args.knn is not None:
         PREDICTOR_NAME = str(args.knn) + "-NN"
         PREDICTOR = lambda: KNNClassificationAggregator(args.knn)
+    elif args.quantile:
+        PREDICTOR_NAME = str(args.quantile) + "-quantile"
+        PREDICTOR = lambda: QuantileClassificationAggregator(args.quantile)
     elif args.avg:
         PREDICTOR_NAME = 'AVG'
         PREDICTOR = lambda: AvgDistClassificationAggregator(log=False)
