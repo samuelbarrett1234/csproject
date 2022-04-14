@@ -17,7 +17,7 @@ const char* INSERT_QUERY =
 "INSERT INTO PairwiseDistances( "
 "	lbltype, compid, ncd_formula, dist_aggregator, "
 "	seqid_1, seqid_2, dist) "
-"VALUES(? , ? , ? , ? , ? , ? , ? )";
+"VALUES(? , ? , ? , ? , ? , ? , ?)";
 
 
 int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt);
@@ -79,7 +79,9 @@ int main(int argc, char* argv[])
 
 int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 {
-	sqlite3_bind_text(p_insert_stmt, 3, "mp", -1, SQLITE_STATIC);
+	size_t count = 0;
+
+	sqlite3_bind_text(p_insert_stmt, 4, "mp", -1, SQLITE_STATIC);
 
 	int lbltype, compid;
 	std::string ncd_formula;
@@ -100,9 +102,9 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 				sqlite3_column_int(p_select_stmt, 6)
 				));
 
-			sqlite3_bind_int(p_insert_stmt, 0, lbltype);
-			sqlite3_bind_int(p_insert_stmt, 1, compid);
-			sqlite3_bind_text(p_insert_stmt, 2, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int(p_insert_stmt, 1, lbltype);
+			sqlite3_bind_int(p_insert_stmt, 2, compid);
+			sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
 		}
 		
 		if (first_iteration)
@@ -117,9 +119,9 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 			ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
 			first_iteration = false;
 
-			sqlite3_bind_int(p_insert_stmt, 0, lbltype);
-			sqlite3_bind_int(p_insert_stmt, 1, compid);
-			sqlite3_bind_text(p_insert_stmt, 2, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
+			sqlite3_bind_int(p_insert_stmt, 1, lbltype);
+			sqlite3_bind_int(p_insert_stmt, 2, compid);
+			sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
 		}
 
 		// extract all of the rows for this group
@@ -161,23 +163,29 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 			}
 
 			// if end of current seqid_other, need to yield
-			if (std::get<0>(rows[i + 1]) != std::get<0>(rows[i]))
+			if (std::get<0>(rows[j + 1]) != std::get<0>(rows[j]))
 			{
 				// bind and yield
-				sqlite3_bind_double(p_insert_stmt, 6, (double)dist);
-				sqlite3_bind_int(p_insert_stmt, 4, std::get<0>(rows[i]));
-				sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
+				sqlite3_bind_double(p_insert_stmt, 7, (double)dist);
+				sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
+				sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[j]));
 				int rc = sqlite3_step(p_insert_stmt);
 				if (rc != SQLITE_DONE)
 					return rc;
 				sqlite3_reset(p_insert_stmt);
 				// do it again but the other way around
-				sqlite3_bind_int(p_insert_stmt, 4, std::get<0>(rows[j]));
-				sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
+				sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
+				sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[i]));
 				rc = sqlite3_step(p_insert_stmt);
 				if (rc != SQLITE_DONE)
 					return rc;
 				sqlite3_reset(p_insert_stmt);
+
+				if (count % 100 == 0)
+				{
+					std::cout << "\rProgress: " << count << std::flush;
+				}
+				count += 2;
 
 				dist = std::numeric_limits<float>::max();
 				++j;
