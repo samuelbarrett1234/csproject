@@ -4,6 +4,7 @@
 #include <vector>
 #include <tuple>
 #include <numeric>
+#include <chrono>
 
 
 const char* SELECT_QUERY =
@@ -45,6 +46,9 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	sqlite3_exec(p_db, "PRAGMA foreign_keys = ON", nullptr, nullptr, nullptr);
+	sqlite3_exec(p_db, "BEGIN TRANSACTION", nullptr, nullptr, nullptr);
+
 	sqlite3_stmt* p_select_stmt = nullptr;
 	rc = sqlite3_prepare_v2(p_db, SELECT_QUERY, -1, &p_select_stmt, nullptr);
 
@@ -72,6 +76,8 @@ int main(int argc, char* argv[])
 	sqlite3_finalize(p_insert_stmt);
 	sqlite3_finalize(p_select_stmt);
 
+	sqlite3_exec(p_db, "COMMIT", nullptr, nullptr, nullptr);
+
 	sqlite3_close(p_db);
 	return 0;
 }
@@ -80,6 +86,7 @@ int main(int argc, char* argv[])
 int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 {
 	size_t count = 0;
+	const auto start_time = std::chrono::system_clock::now();
 
 	sqlite3_bind_text(p_insert_stmt, 4, "mp", -1, SQLITE_STATIC);
 
@@ -183,7 +190,16 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 
 				if (count % 100 == 0)
 				{
-					std::cout << "\rProgress: " << count << std::flush;
+					const auto cur_time = std::chrono::system_clock::now();
+					const size_t millis =
+						std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - start_time).count();
+					std::cout << "\rProgress: " << count
+						<< " in "
+						<< millis
+						<< "ms, giving "
+						<< (float)millis / (float)count << "ms/seq, or "
+						<< (float)(count * 1000) / (float)millis << "seq/s."
+						<< std::flush;
 				}
 				count += 2;
 
