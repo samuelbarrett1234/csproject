@@ -1,4 +1,5 @@
 csproject_pairwise_dists/out/
+.vs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
