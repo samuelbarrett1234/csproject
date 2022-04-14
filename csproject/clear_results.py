@@ -35,6 +35,7 @@ if __name__ == "__main__":
     cur.execute("DELETE FROM LabelScores")
     cur.execute("DELETE FROM ResultAccuracies")
     cur.execute("DELETE FROM TrainingPairings")
+    cur.execute("DELETE FROM PairwiseDistances")
 
     db.commit()
     db.close()
