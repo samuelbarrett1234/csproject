@@ -49,6 +49,8 @@ int main(int argc, char* argv[])
 	}
 
 	sqlite3_exec(p_db, "PRAGMA foreign_keys = ON", nullptr, nullptr, nullptr);
+	// sqlite3_exec(p_db, "PRAGMA synchronous = OFF", nullptr, nullptr, nullptr);
+	// sqlite3_exec(p_db, "PRAGMA journal_mode = MEMORY", nullptr, nullptr, nullptr);
 	sqlite3_exec(p_db, "BEGIN TRANSACTION", nullptr, nullptr, nullptr);
 
 	sqlite3_stmt* p_select_stmt = nullptr;
@@ -105,6 +107,9 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 		case SQLITE_ROW:
 			if (first_iteration)
 			{
+				// do this before changing `ncd_formula`
+				sqlite3_bind_null(p_select_stmt, 2);
+
 				lbltype = sqlite3_column_int(p_select_stmt, 0);
 				compid = sqlite3_column_int(p_select_stmt, 1);
 				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
@@ -113,14 +118,18 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 
 				sqlite3_bind_int(p_insert_stmt, 1, lbltype);
 				sqlite3_bind_int(p_insert_stmt, 2, compid);
-				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
+				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_STATIC);
 			}
 			// if finished current lbltype/compid/ncd_formula group:
 			if (lbltype != sqlite3_column_int(p_select_stmt, 0)
 				|| compid != sqlite3_column_int(p_select_stmt, 1)
 				|| ncd_formula != (const char*)sqlite3_column_text(p_select_stmt, 2))
 			{
+				std::cout << std::endl;
 				rc = save(p_insert_stmt, std::move(rows));
+
+				// do this before changing `ncd_formula`
+				sqlite3_bind_null(p_select_stmt, 2);
 
 				lbltype = sqlite3_column_int(p_select_stmt, 0);
 				compid = sqlite3_column_int(p_select_stmt, 1);
@@ -128,7 +137,7 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 
 				sqlite3_bind_int(p_insert_stmt, 1, lbltype);
 				sqlite3_bind_int(p_insert_stmt, 2, compid);
-				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
+				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_STATIC);
 			}
 			// add current row data
 			rows.emplace_back(std::make_tuple(
@@ -143,7 +152,7 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 				const auto cur_time = std::chrono::system_clock::now();
 				const size_t millis =
 					std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - start_time).count();
-				std::cout << "\rProgress: " << count
+				std::cout << "\rLoading progress: " << count
 					<< " in "
 					<< millis
 					<< "ms, giving "
@@ -166,6 +175,9 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 
 int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, int>> rows)
 {
+	size_t count = 0;
+	const auto start_time = std::chrono::system_clock::now();
+
 	// assume the lbltype/compid/ncd_formula/dist_aggregator are already bound in the statement
 	// do a kind of double iteration
 	size_t i = 0, i_0 = 0, j = 0;
@@ -209,6 +221,21 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 				return rc;
 			sqlite3_reset(p_insert_stmt);
 
+			if (count % 100 == 0)
+			{
+				const auto cur_time = std::chrono::system_clock::now();
+				const size_t millis =
+					std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - start_time).count();
+				std::cout << "\rSaving progress: " << count
+					<< " in "
+					<< millis
+					<< "ms, giving "
+					<< (float)millis / (float)count << "ms/seq, or "
+					<< (float)(count * 1000) / (float)millis << "seq/s."
+					<< std::flush;
+			}
+			count += 2;
+
 			dist = std::numeric_limits<float>::max();
 			++j;
 			i = i_0;
@@ -240,5 +267,6 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 		}
 	}
 
+	std::cout << std::endl;
 	return SQLITE_OK;
 }
