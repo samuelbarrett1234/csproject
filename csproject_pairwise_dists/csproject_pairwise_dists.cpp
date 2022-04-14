@@ -188,6 +188,7 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 		++j;
 
 	float dist = std::numeric_limits<float>::max();
+	int seqid_train;
 	while (i < rows.size() && j < rows.size())
 	{
 		if (std::get<1>(rows[i]) != std::get<1>(rows[j]))
@@ -200,6 +201,7 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 		if (std::get<2>(rows[i]) + std::get<2>(rows[j]) < dist)
 		{
 			dist = std::get<2>(rows[i]) + std::get<2>(rows[j]);
+			seqid_train = std::get<1>(rows[i]);
 		}
 
 		// if end of current seqid_other, need to yield
@@ -208,7 +210,7 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 			// bind and yield
 
 			sqlite3_bind_double(p_insert_stmt, 8, (double)dist);
-			sqlite3_bind_int(p_insert_stmt, 7, std::get<1>(rows[i]));  // could replace with j here, see check above
+			sqlite3_bind_int(p_insert_stmt, 7, seqid_train);  // could replace with j here, see check above
 
 			// first way round
 			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
