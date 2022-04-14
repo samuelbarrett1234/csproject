@@ -7,6 +7,7 @@ SQL query but it is too slow.
 
 
 import os
+import math
 import sqlite3 as sql
 import argparse as ap
 import progressbar as pgb
@@ -14,37 +15,80 @@ import progressbar as pgb
 
 def generate_pair_dists(db):
     cur = db.cursor()
-    # get all pairs of sequences which are non-train and in the same partition,
-    # alongside each lbltype/compid/ncd_formula combination
+    # note: we know that the outputs of this query are unique as it
+    # is a superset of a key
     cur.execute("""
-    WITH TrainingPairingsAugmented AS (
-        SELECT DISTINCT lbltype, compid, ncd_formula, seqid_other, seqpart
-        FROM TrainingPairings JOIN Sequences ON seqid_other = seqid
-        WHERE seqpart > 0
-    )
-    SELECT DISTINCT lbltype, compid, ncd_formula, A.seqid_other AS seqid_1, B.seqid_other AS seqid_2
-    FROM TrainingPairingsAugmented AS A JOIN TrainingPairingsAugmented AS B
-    USING (lbltype, compid, ncd_formula, seqpart)
+    SELECT lbltype, compid, ncd_formula, seqid_other, seqid_train, ncd_value, seqpart
+    FROM TrainingPairings JOIN Sequences ON seqid_other = seqid
+    WHERE seqpart > 0
+    ORDER BY lbltype, compid, ncd_formula, seqid_other, seqid_train
     """)
-    # for a given pair of sequences and lbltype/compid/ncd_formula combination,
-    # varying over all training sequences, find the one which minimises A+B ncd values
-    q = """
-    SELECT MIN(A.ncd_value + B.ncd_value) AS dist
-    FROM TrainingPairings AS A
-    JOIN TrainingPairings AS B USING (lbltype, compid, ncd_formula, seqid_train)
-    WHERE A.lbltype = ? AND A.compid = ? AND A.ncd_formula = ? AND A.seqid_other = ?
-    AND B.lbltype = ? AND B.compid = ? AND B.ncd_formula = ? AND B.seqid_other = ?
-    """
-    while True:
-        tuple = cur.fetchone()
-        if tuple is None:
-            return
-        (lbltype, compid, ncd_formula, seqid_1, seqid_2) = tuple
 
-        cur1 = db.cursor()
-        cur1.execute(q, (lbltype, compid, ncd_formula, seqid_1, lbltype, compid, ncd_formula, seqid_2))
-        dist = cur.fetchone()[0]
-        yield (lbltype, compid, ncd_formula, 'mp', seqid_1, seqid_2, dist)
+    lbltype, compid, ncd_formula, tuple = None, None, None, None
+    rows = []
+    while True:
+        # firstly, collect all relevant rows
+        if tuple is not None:
+            rows = [tuple[3:]]
+            lbltype, compid, ncd_formula = tuple[:3]
+
+        tuple = cur.fetchone()
+
+        if lbltype is None:  # only triggers on first iteration
+            lbltype, compid, ncd_formula = tuple[:3]
+
+        while (lbltype, compid, ncd_formula) == tuple[:3]:
+            rows.append(tuple[3:])
+            tuple = cur.fetchone()
+            if tuple is None:
+                break
+
+        # now do a kind of double iteration
+        i, i_0, j = 0, 0, 0
+        # forward j to the point where its seqid_other is different
+        # to that of i but has the same seqpart
+        while rows[j][0] == rows[i][0] or rows[i][3] != rows[j][3]:
+            j += 1
+
+        dist = math.inf
+        while i < len(rows):
+            assert (j < len(rows))
+            assert (rows[i][1] == rows[j][1])
+            assert (rows[i][3] == rows[j][3])
+
+            # get shortest distance
+            if rows[i][2] + rows[j][2] < dist:
+                dist = rows[i][2] + rows[j][2]
+
+            # if end of current seqid_other, need to yield
+            if rows[i + 1][0] != rows[i][0]:
+                yield (lbltype, compid, ncd_formula, 'mp', rows[i][0], rows[j][0], dist)
+                yield (lbltype, compid, ncd_formula, 'mp', rows[j][0], rows[i][0], dist)
+                dist = math.inf
+                j += 1
+                i = i_0
+                # forward j to the point where it has the same seqpart as i
+                while j < len(rows) and rows[i][3] != rows[j][3]:
+                    j += 1
+            else:
+                i += 1
+                j += 1
+
+            while j == len(rows) and i < len(rows):
+                # forward i to the point where its seqid_other is different
+                while i + 1 < len(rows) and rows[i + 1][0] == rows[i][0]:
+                    i += 1
+                if i < len(rows):
+                    i += 1
+
+                # reset i_0 and j
+                i_0 = i
+                j = i
+
+                # forward j to the point where its seqid_other is different
+                # to that of i but has the same seqpart
+                while j < len(rows) and (rows[j][0] == rows[i][0] or rows[i][3] != rows[j][3]):
+                    j += 1
 
 
 if __name__ == "__main__":
