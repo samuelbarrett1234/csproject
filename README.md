@@ -7,7 +7,7 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 
 - Install the requirements given in `requirements.txt`.
 - Open the Python shell, run `import nltk` then `nltk.download('punkt')`.
-- In the root of the repository directory, run `python compressors/setup.py build_ext --inplace`.
+- In the root of the `csproject` subdirectory of the root, run `python compressors/setup.py build_ext --inplace`.
 
 ## How to use this repository
 
