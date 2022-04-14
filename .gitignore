@@ -1,3 +1,5 @@
+csproject_pairwise_dists/out/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
