@@ -30,15 +30,17 @@ def get_graphs(db):
 
         cur2.execute(
             "SELECT seqid_1, seqid_2, dist, lbl "
-            "FROM PairwiseDistances JOIN Labels ON seqid = seqid_train "
+            "FROM PairwiseDistances JOIN Labels ON Labels.seqid = seqid_train "
+            "JOIN Sequences ON seqid_1 = Sequences.seqid "
             "WHERE Labels.lbltype = ? AND PairwiseDistances.lbltype = ? AND "
-            "compid = ? AND ncd_formula = ? AND dist_aggregator = ?",
-            (lbltype, lbltype, compid, ncd_formula, dist_aggregator)
+            "compid = ? AND ncd_formula = ? AND dist_aggregator = ? AND seqpart = ?",
+            (lbltype, lbltype, compid, ncd_formula, dist_aggregator, seqpart)
         )
 
         G = nx.from_pandas_edgelist(
             pd.DataFrame(cur2.fetchall(),
-                         columns=["seqid_1", "seqid_2", "dist", "lbl"])
+                         columns=["seqid_1", "seqid_2", "dist", "lbl"]),
+            "seqid_1", "seqid_2", ["dist", "lbl"]
         )
 
         yield lbltype, compid, ncd_formula, dist_aggregator, seqpart, G
@@ -50,10 +52,10 @@ def classify(datum):
     # get MST
     G_mst = nx.minimum_spanning_tree(G, weight="dist")
 
-    for n in G_mst.nodes():
+    for seqid in G_mst.nodes():
         # vote on neighbouring edge labels on that node in the MST
         lbls = {}
-        for _, _, lbl in G_mst.edges(n, data="lbl"):
+        for _, _, lbl in G_mst.edges(seqid, data="lbl"):
             if lbl not in lbls:
                 lbls[lbl] = 0
             lbls[lbl] += 1
@@ -66,7 +68,7 @@ def classify(datum):
                 max_count = n
                 max_lbl = lbl
 
-        yield (lbltype, compid, ncd_formula, 'MST-' + dist_aggregator, n, max_lbl)
+        yield (lbltype, compid, ncd_formula, 'MST-' + dist_aggregator, seqid, max_lbl)
 
 
 if __name__ == "__main__":
@@ -83,8 +85,8 @@ if __name__ == "__main__":
 
     cur_out = db.cursor()
     cur_out.executemany(
-    """INSERT INTO Predictions(lbltype, compid, ncd_formula, seqid, lbl)
-    VALUES (?, ?, ?, ?, ?)
+    """INSERT INTO Predictions(lbltype, compid, ncd_formula, predictor, seqid, lbl)
+    VALUES (?, ?, ?, ?, ?, ?)
     """,
     # generator expression: first get each graph (with hyperparameters) in
     # the DB, then classify each node within that graph and yield it.
