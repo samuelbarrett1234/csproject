@@ -5,6 +5,7 @@
 #include <tuple>
 #include <numeric>
 #include <chrono>
+#include <cassert>
 
 
 const char* SELECT_QUERY =
@@ -22,6 +23,7 @@ const char* INSERT_QUERY =
 
 
 int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt);
+int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, int>> rows);
 
 
 int main(int argc, char* argv[])
@@ -70,7 +72,7 @@ int main(int argc, char* argv[])
 	rc = execute(p_insert_stmt, p_select_stmt);
 	if (rc != SQLITE_OK)
 	{
-		std::cerr << "Execution failed. Error: " << sqlite3_errmsg(p_db) << std::endl;
+		std::cerr << "Execution failed. Possible error: " << sqlite3_errmsg(p_db) << std::endl;
 		return 1;
 	}
 	sqlite3_finalize(p_insert_stmt);
@@ -94,144 +96,149 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 	std::string ncd_formula;
 	std::vector<std::tuple<int, int, float, int>> rows;
 	bool first_iteration = true;
-	while (true)
+	bool done = false;
+	while (!done)
 	{
-		if (!first_iteration)
+		int rc = sqlite3_step(p_select_stmt);
+		switch (rc)
 		{
-			lbltype = sqlite3_column_int(p_select_stmt, 0);
-			compid = sqlite3_column_int(p_select_stmt, 1);
-			ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
-			rows.clear();
+		case SQLITE_ROW:
+			if (first_iteration)
+			{
+				lbltype = sqlite3_column_int(p_select_stmt, 0);
+				compid = sqlite3_column_int(p_select_stmt, 1);
+				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
+
+				first_iteration = false;
+
+				sqlite3_bind_int(p_insert_stmt, 1, lbltype);
+				sqlite3_bind_int(p_insert_stmt, 2, compid);
+				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
+			}
+			// if finished current lbltype/compid/ncd_formula group:
+			if (lbltype != sqlite3_column_int(p_select_stmt, 0)
+				|| compid != sqlite3_column_int(p_select_stmt, 1)
+				|| ncd_formula != (const char*)sqlite3_column_text(p_select_stmt, 2))
+			{
+				rc = save(p_insert_stmt, std::move(rows));
+
+				lbltype = sqlite3_column_int(p_select_stmt, 0);
+				compid = sqlite3_column_int(p_select_stmt, 1);
+				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
+
+				sqlite3_bind_int(p_insert_stmt, 1, lbltype);
+				sqlite3_bind_int(p_insert_stmt, 2, compid);
+				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
+			}
+			// add current row data
 			rows.emplace_back(std::make_tuple(
 				sqlite3_column_int(p_select_stmt, 3),
 				sqlite3_column_int(p_select_stmt, 4),
 				(float)sqlite3_column_double(p_select_stmt, 5),
 				sqlite3_column_int(p_select_stmt, 6)
-				));
-
-			sqlite3_bind_int(p_insert_stmt, 1, lbltype);
-			sqlite3_bind_int(p_insert_stmt, 2, compid);
-			sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
-		}
-		
-		if (first_iteration)
-		{
-			int rc = sqlite3_step(p_select_stmt);
-			
-			if (rc != SQLITE_ROW)
-				return rc;
-
-			lbltype = sqlite3_column_int(p_select_stmt, 0);
-			compid = sqlite3_column_int(p_select_stmt, 1);
-			ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
-			first_iteration = false;
-
-			sqlite3_bind_int(p_insert_stmt, 1, lbltype);
-			sqlite3_bind_int(p_insert_stmt, 2, compid);
-			sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_TRANSIENT);
-		}
-
-		// extract all of the rows for this group
-		while (lbltype == sqlite3_column_int(p_select_stmt, 0)
-			&& compid == sqlite3_column_int(p_select_stmt, 1)
-			&& ncd_formula == (const char*)sqlite3_column_text(p_select_stmt, 2))
-		{
-			int rc = sqlite3_step(p_select_stmt);
-			switch (rc)
+			));
+			++count;
+			if (count % 100 == 0)
 			{
-			case SQLITE_DONE:
-				break;
-			case SQLITE_ROW:
-				rows.emplace_back(std::make_tuple(
-					sqlite3_column_int(p_select_stmt, 3),
-					sqlite3_column_int(p_select_stmt, 4),
-					(float)sqlite3_column_double(p_select_stmt, 5),
-					sqlite3_column_int(p_select_stmt, 6)
-					));
-				break;
-			default:
-				return rc;
+				const auto cur_time = std::chrono::system_clock::now();
+				const size_t millis =
+					std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - start_time).count();
+				std::cout << "\rProgress: " << count
+					<< " in "
+					<< millis
+					<< "ms, giving "
+					<< (float)millis / (float)count << "ms/seq, or "
+					<< (float)(count * 1000) / (float)millis << "seq/s."
+					<< std::flush;
 			}
-		}
-
-		// now do a kind of double iteration
-		size_t i = 0, i_0 = 0, j = 0;
-
-		while (std::get<0>(rows[j]) == std::get<0>(rows[i]) || std::get<3>(rows[i]) != std::get<3>(rows[j]))
-			++j;
-
-		float dist = std::numeric_limits<float>::max();
-		while (i < rows.size())
-		{
-			// get shortest distance
-			if (std::get<2>(rows[i]) + std::get<2>(rows[j]) < dist)
-			{
-				dist = std::get<2>(rows[i]) + std::get<2>(rows[j]);
-			}
-
-			// if end of current seqid_other, need to yield
-			if (std::get<0>(rows[j + 1]) != std::get<0>(rows[j]))
-			{
-				// bind and yield
-				sqlite3_bind_double(p_insert_stmt, 7, (double)dist);
-				sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
-				sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[j]));
-				int rc = sqlite3_step(p_insert_stmt);
-				if (rc != SQLITE_DONE)
-					return rc;
-				sqlite3_reset(p_insert_stmt);
-				// do it again but the other way around
-				sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
-				sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[i]));
-				rc = sqlite3_step(p_insert_stmt);
-				if (rc != SQLITE_DONE)
-					return rc;
-				sqlite3_reset(p_insert_stmt);
-
-				if (count % 100 == 0)
-				{
-					const auto cur_time = std::chrono::system_clock::now();
-					const size_t millis =
-						std::chrono::duration_cast<std::chrono::milliseconds>(cur_time - start_time).count();
-					std::cout << "\rProgress: " << count
-						<< " in "
-						<< millis
-						<< "ms, giving "
-						<< (float)millis / (float)count << "ms/seq, or "
-						<< (float)(count * 1000) / (float)millis << "seq/s."
-						<< std::flush;
-				}
-				count += 2;
-
-				dist = std::numeric_limits<float>::max();
-				++j;
-				i = i_0;
-				// forward j to the point where it has the same seqpart as i
-				while (j < rows.size() && std::get<3>(rows[i]) != std::get<3>(rows[j]))
-					++j;
-			}
-			else
-			{
-				++i;
-				++j;
-			}
-
-			while (j == rows.size() && i < rows.size())
-			{
-				// forward i to the point where its seqid_other is different
-				while (i + 1 < rows.size() && std::get<0>(rows[i + 1]) == std::get<0>(rows[i]))
-					++i;
-				++i;
-
-				// reset i_0 and j
-				i_0 = i;
-				j = i;
-
-				// forward j to the point where seqid_other is different
-				// to that of i but has the same seqpart
-				while (j < rows.size() && (std::get<0>(rows[j]) == std::get<0>(rows[i]) || std::get<3>(rows[i]) != std::get<3>(rows[j])))
-					++j;
-			}
+			break;
+		case SQLITE_DONE:
+			done = true;
+			break;
+		default:
+			return rc;
 		}
 	}
+
+	return SQLITE_OK;
+}
+
+
+int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, int>> rows)
+{
+	// assume the lbltype/compid/ncd_formula/dist_aggregator are already bound in the statement
+	// do a kind of double iteration
+	size_t i = 0, i_0 = 0, j = 0;
+
+	// forward j to the point where seqid_other is different
+	// to that of i but has the same seqpart
+	while (j < rows.size() && (std::get<0>(rows[j]) == std::get<0>(rows[i]) || std::get<3>(rows[i]) != std::get<3>(rows[j])))
+		++j;
+
+	float dist = std::numeric_limits<float>::max();
+	while (i < rows.size() && j < rows.size())
+	{
+		if (std::get<1>(rows[i]) != std::get<1>(rows[j]))
+		{
+			std::cerr << "Oops! Invariant failed." << std::endl;
+			return -1;
+		}
+
+		// get shortest distance
+		if (std::get<2>(rows[i]) + std::get<2>(rows[j]) < dist)
+		{
+			dist = std::get<2>(rows[i]) + std::get<2>(rows[j]);
+		}
+
+		// if end of current seqid_other, need to yield
+		if (std::get<0>(rows[j + 1]) != std::get<0>(rows[j]))
+		{
+			// bind and yield
+			sqlite3_bind_double(p_insert_stmt, 7, (double)dist);
+			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
+			sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[j]));
+			int rc = sqlite3_step(p_insert_stmt);
+			if (rc != SQLITE_DONE)
+				return rc;
+			sqlite3_reset(p_insert_stmt);
+			// do it again but the other way around
+			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
+			sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[i]));
+			rc = sqlite3_step(p_insert_stmt);
+			if (rc != SQLITE_DONE)
+				return rc;
+			sqlite3_reset(p_insert_stmt);
+
+			dist = std::numeric_limits<float>::max();
+			++j;
+			i = i_0;
+			// forward j to the point where it has the same seqpart as i
+			while (j < rows.size() && std::get<3>(rows[i]) != std::get<3>(rows[j]))
+				++j;
+		}
+		else
+		{
+			++i;
+			++j;
+		}
+
+		while (j == rows.size() && i < rows.size())
+		{
+			// forward i to the point where its seqid_other is different
+			while (i + 1 < rows.size() && std::get<0>(rows[i + 1]) == std::get<0>(rows[i]))
+				++i;
+			++i;
+
+			// reset i_0 and j
+			i_0 = i;
+			j = i;
+
+			// forward j to the point where seqid_other is different
+			// to that of i but has the same seqpart
+			while (j < rows.size() && (std::get<0>(rows[j]) == std::get<0>(rows[i]) || std::get<3>(rows[i]) != std::get<3>(rows[j])))
+				++j;
+		}
+	}
+
+	return SQLITE_OK;
 }
