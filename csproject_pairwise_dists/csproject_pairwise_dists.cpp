@@ -41,7 +41,7 @@ int main(int argc, char* argv[])
 	
 	if (rc != 0)
 	{
-		std::cerr << "Error opening database." << std::endl;
+		std::cerr << "Error opening database. Error: " << sqlite3_errmsg(p_db) << std::endl;
 		return 1;
 	}
 
@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
 
 	if (rc != SQLITE_OK || p_select_stmt == nullptr)
 	{
-		std::cerr << "Failed to start select statement." << std::endl;
+		std::cerr << "Failed to start select statement. Error: " << sqlite3_errmsg(p_db) << std::endl;
 		return 1;
 	}
 
@@ -59,14 +59,14 @@ int main(int argc, char* argv[])
 
 	if (rc != SQLITE_OK || p_insert_stmt == nullptr)
 	{
-		std::cerr << "Failed to start insert statement." << std::endl;
+		std::cerr << "Failed to start insert statement. Error: " << sqlite3_errmsg(p_db) << std::endl;
 		return 1;
 	}
 
 	rc = execute(p_insert_stmt, p_select_stmt);
 	if (rc != SQLITE_OK)
 	{
-		std::cerr << "Execution failed." << std::endl;
+		std::cerr << "Execution failed. Error: " << sqlite3_errmsg(p_db) << std::endl;
 		return 1;
 	}
 	sqlite3_finalize(p_insert_stmt);
