@@ -18,8 +18,8 @@ const char* SELECT_QUERY =
 const char* INSERT_QUERY =
 "INSERT INTO PairwiseDistances( "
 "	lbltype, compid, ncd_formula, dist_aggregator, "
-"	seqid_1, seqid_2, dist) "
-"VALUES(? , ? , ? , ? , ? , ? , ?)";
+"	seqid_1, seqid_2, seqid_train, dist) "
+"VALUES(? , ? , ? , ? , ? , ? , ?, ?)";
 
 
 int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt);
@@ -206,13 +206,18 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 		if (std::get<0>(rows[j + 1]) != std::get<0>(rows[j]))
 		{
 			// bind and yield
-			sqlite3_bind_double(p_insert_stmt, 7, (double)dist);
+
+			sqlite3_bind_double(p_insert_stmt, 8, (double)dist);
+			sqlite3_bind_int(p_insert_stmt, 7, std::get<1>(rows[i]));  // could replace with j here, see check above
+
+			// first way round
 			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
 			sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[j]));
 			int rc = sqlite3_step(p_insert_stmt);
 			if (rc != SQLITE_DONE)
 				return rc;
 			sqlite3_reset(p_insert_stmt);
+
 			// do it again but the other way around
 			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
 			sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[i]));

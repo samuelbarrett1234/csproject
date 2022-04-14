@@ -254,6 +254,7 @@ CREATE TABLE PairwiseDistances(
     dist_aggregator TEXT NOT NULL,
     seqid_1 INTEGER NOT NULL REFERENCES Sequences(seqid),
     seqid_2 INTEGER NOT NULL REFERENCES Sequences(seqid),
+    seqid_train INTEGER NOT NULL REFERENCES Sequences(seqid),
     dist REAL NOT NULL,
     PRIMARY KEY(lbltype, compid, ncd_formula, dist_aggregator, seqid_1, seqid_2)
 );
