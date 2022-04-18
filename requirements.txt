@@ -8,3 +8,9 @@ cython
 miditok
 miditoolkit
 matplotlib
+networkx
+jupyter
+scikit-learn
+scipy
+dask
+pandas
