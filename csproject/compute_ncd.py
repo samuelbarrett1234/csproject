@@ -73,21 +73,16 @@ if __name__ == "__main__":
     cur2.execute("DELETE FROM TrainingPairings")
     cur2.execute("""
     INSERT INTO TrainingPairings(
-        seqid_train, seqid_other, lbltype, lbl,
-        ncd_formula, ncd_value, compid
+        compid, ncd_formula, seqid_train, seqid_other, ncd_value
     )
-    SELECT seqid_left AS seqid_train, seqid_right AS seqid_other,
-    lbltype, lbl, ncd_formula, ncd_value, compid
+    SELECT compid, ncd_formula, seqid_left AS seqid_train, seqid_right AS seqid_other, ncd_value
     FROM SequencePairings JOIN Sequences ON seqid_left = Sequences.seqid
     JOIN NCDValues ON seqid_out = NCDValues.seqid
-    JOIN Labels ON Sequences.seqid = Labels.seqid
     WHERE Sequences.seqpart = 0
     UNION
-    SELECT seqid_right AS seqid_train, seqid_left AS seqid_other,
-    lbltype, lbl, ncd_formula, ncd_value, compid
+    SELECT compid, ncd_formula, seqid_right AS seqid_train, seqid_left AS seqid_other, ncd_value
     FROM SequencePairings JOIN Sequences ON seqid_right = Sequences.seqid
     JOIN NCDValues ON seqid_out = NCDValues.seqid
-    JOIN Labels ON Sequences.seqid = Labels.seqid
     WHERE Sequences.seqpart = 0
     """)
 

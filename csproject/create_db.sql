@@ -132,34 +132,26 @@ CREATE TABLE NCDValues(
 );
 
 CREATE TABLE TrainingPairings (
-    lbltype INTEGER NOT NULL,
     ncd_formula TEXT NOT NULL,
     compid INTEGER NOT NULL,
     seqid_train INTEGER NOT NULL,
     seqid_other INTEGER NOT NULL,
-    lbl INTEGER NOT NULL,
     ncd_value REAL NOT NULL,
-    PRIMARY KEY (lbltype, compid, ncd_formula, seqid_other, seqid_train),
-    FOREIGN KEY (lbltype, seqid_train) REFERENCES Labels(lbltype, seqid),
-    FOREIGN KEY (lbltype, lbl) REFERENCES LabelDictionary(lbltype, lbl)
+    PRIMARY KEY (compid, ncd_formula, seqid_other, seqid_train)
 );  /*This table is computed by the following query and acts as a materialised view:
 
-SELECT seqid_left AS seqid_train, seqid_right AS seqid_other,
-lbltype, lbl, ncd_formula, ncd_value, compid
+SELECT compid, ncd_formula, seqid_left AS seqid_train, seqid_right AS seqid_other, ncd_value
 FROM SequencePairings JOIN Sequences ON seqid_left = Sequences.seqid
 JOIN NCDValues ON seqid_out = NCDValues.seqid
-JOIN Labels ON Sequences.seqid = Labels.seqid
 WHERE Sequences.seqpart = 0
 UNION
-SELECT seqid_right AS seqid_train, seqid_left AS seqid_other,
-lbltype, lbl, ncd_formula, ncd_value, compid
+SELECT compid, ncd_formula, seqid_right AS seqid_train, seqid_left AS seqid_other, ncd_value
 FROM SequencePairings JOIN Sequences ON seqid_right = Sequences.seqid
 JOIN NCDValues ON seqid_out = NCDValues.seqid
-JOIN Labels ON Sequences.seqid = Labels.seqid
 WHERE Sequences.seqpart = 0
 */
 
-CREATE INDEX TrainPairIndex ON TrainingPairings(lbltype, compid, ncd_formula, seqid_other, seqid_train);
+CREATE INDEX TrainPairIndex ON TrainingPairings(compid, ncd_formula, seqid_other, seqid_train);
 
 CREATE TABLE Predictions(
     -- INVARIANT: `seqid.seq_is_pair = 0`
@@ -248,7 +240,6 @@ CREATE TABLE LabelScores(
 
 
 CREATE TABLE PairwiseDistances(
-    lbltype INTEGER NOT NULL,
     compid INTEGER NOT NULL REFERENCES Compressors(compid),
     ncd_formula TEXT NOT NULL,
     dist_aggregator TEXT NOT NULL,
@@ -256,5 +247,5 @@ CREATE TABLE PairwiseDistances(
     seqid_2 INTEGER NOT NULL REFERENCES Sequences(seqid),
     seqid_train INTEGER NOT NULL REFERENCES Sequences(seqid),
     dist REAL NOT NULL,
-    PRIMARY KEY(lbltype, compid, ncd_formula, dist_aggregator, seqid_1, seqid_2)
+    PRIMARY KEY(compid, ncd_formula, dist_aggregator, seqid_1, seqid_2)
 );

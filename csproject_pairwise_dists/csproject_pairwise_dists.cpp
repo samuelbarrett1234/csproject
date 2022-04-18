@@ -9,17 +9,17 @@
 
 
 const char* SELECT_QUERY =
-"SELECT lbltype, compid, ncd_formula, seqid_other, seqid_train, ncd_value, seqpart "
+"SELECT compid, ncd_formula, seqid_other, seqid_train, ncd_value, seqpart "
 "FROM TrainingPairings JOIN Sequences ON seqid_other = seqid "
 "WHERE seqpart > 0 "
-"ORDER BY lbltype, compid, ncd_formula, seqid_other, seqid_train";
+"ORDER BY compid, ncd_formula, seqid_other, seqid_train";
 
 
 const char* INSERT_QUERY =
 "INSERT INTO PairwiseDistances( "
-"	lbltype, compid, ncd_formula, dist_aggregator, "
+"	compid, ncd_formula, dist_aggregator, "
 "	seqid_1, seqid_2, seqid_train, dist) "
-"VALUES(? , ? , ? , ? , ? , ? , ?, ?)";
+"VALUES(? , ? , ? , ? , ? , ?, ?)";
 
 
 int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt);
@@ -92,9 +92,9 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 	size_t count = 0;
 	const auto start_time = std::chrono::system_clock::now();
 
-	sqlite3_bind_text(p_insert_stmt, 4, "mp", -1, SQLITE_STATIC);
+	sqlite3_bind_text(p_insert_stmt, 3, "mp", -1, SQLITE_STATIC);
 
-	int lbltype, compid;
+	int compid;
 	std::string ncd_formula;
 	std::vector<std::tuple<int, int, float, int>> rows;
 	bool first_iteration = true;
@@ -108,43 +108,40 @@ int execute(sqlite3_stmt* p_insert_stmt, sqlite3_stmt* p_select_stmt)
 			if (first_iteration)
 			{
 				// do this before changing `ncd_formula`
-				sqlite3_bind_null(p_select_stmt, 2);
+				sqlite3_bind_null(p_insert_stmt, 2);
 
-				lbltype = sqlite3_column_int(p_select_stmt, 0);
-				compid = sqlite3_column_int(p_select_stmt, 1);
-				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
+				compid = sqlite3_column_int(p_select_stmt, 0);
+				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 1);
 
 				first_iteration = false;
 
-				sqlite3_bind_int(p_insert_stmt, 1, lbltype);
-				sqlite3_bind_int(p_insert_stmt, 2, compid);
-				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_STATIC);
+				sqlite3_bind_int(p_insert_stmt, 1, compid);
+				sqlite3_bind_text(p_insert_stmt, 2, ncd_formula.c_str(), -1, SQLITE_STATIC);
 			}
-			// if finished current lbltype/compid/ncd_formula group:
-			if (lbltype != sqlite3_column_int(p_select_stmt, 0)
-				|| compid != sqlite3_column_int(p_select_stmt, 1)
-				|| ncd_formula != (const char*)sqlite3_column_text(p_select_stmt, 2))
+			// if finished current compid/ncd_formula group:
+			if (compid != sqlite3_column_int(p_select_stmt, 0)
+				|| ncd_formula != (const char*)sqlite3_column_text(p_select_stmt, 1))
 			{
 				std::cout << std::endl;
 				rc = save(p_insert_stmt, std::move(rows));
+				if (rc != SQLITE_OK)
+					return rc;
 
 				// do this before changing `ncd_formula`
-				sqlite3_bind_null(p_select_stmt, 2);
+				sqlite3_bind_null(p_insert_stmt, 2);
 
-				lbltype = sqlite3_column_int(p_select_stmt, 0);
-				compid = sqlite3_column_int(p_select_stmt, 1);
-				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 2);
+				compid = sqlite3_column_int(p_select_stmt, 0);
+				ncd_formula = (const char*)sqlite3_column_text(p_select_stmt, 1);
 
-				sqlite3_bind_int(p_insert_stmt, 1, lbltype);
-				sqlite3_bind_int(p_insert_stmt, 2, compid);
-				sqlite3_bind_text(p_insert_stmt, 3, ncd_formula.c_str(), -1, SQLITE_STATIC);
+				sqlite3_bind_int(p_insert_stmt, 1, compid);
+				sqlite3_bind_text(p_insert_stmt, 2, ncd_formula.c_str(), -1, SQLITE_STATIC);
 			}
 			// add current row data
 			rows.emplace_back(std::make_tuple(
+				sqlite3_column_int(p_select_stmt, 2),
 				sqlite3_column_int(p_select_stmt, 3),
-				sqlite3_column_int(p_select_stmt, 4),
-				(float)sqlite3_column_double(p_select_stmt, 5),
-				sqlite3_column_int(p_select_stmt, 6)
+				(float)sqlite3_column_double(p_select_stmt, 4),
+				sqlite3_column_int(p_select_stmt, 5)
 			));
 			++count;
 			if (count % 100 == 0)
@@ -209,20 +206,20 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 		{
 			// bind and yield
 
-			sqlite3_bind_double(p_insert_stmt, 8, (double)dist);
-			sqlite3_bind_int(p_insert_stmt, 7, seqid_train);  // could replace with j here, see check above
+			sqlite3_bind_double(p_insert_stmt, 7, (double)dist);
+			sqlite3_bind_int(p_insert_stmt, 6, seqid_train);  // could replace with j here, see check above
 
 			// first way round
-			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
-			sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[j]));
+			sqlite3_bind_int(p_insert_stmt, 4, std::get<0>(rows[i]));
+			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
 			int rc = sqlite3_step(p_insert_stmt);
 			if (rc != SQLITE_DONE)
 				return rc;
 			sqlite3_reset(p_insert_stmt);
 
 			// do it again but the other way around
-			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[j]));
-			sqlite3_bind_int(p_insert_stmt, 6, std::get<0>(rows[i]));
+			sqlite3_bind_int(p_insert_stmt, 4, std::get<0>(rows[j]));
+			sqlite3_bind_int(p_insert_stmt, 5, std::get<0>(rows[i]));
 			rc = sqlite3_step(p_insert_stmt);
 			if (rc != SQLITE_DONE)
 				return rc;
