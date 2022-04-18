@@ -6,7 +6,7 @@ Included in the compression algorithms are novel BERT-based ones that I have dev
 ## Setup
 
 - Install the requirements given in `requirements.txt`.
-- Open the Python shell, run `import nltk` then `nltk.download('punkt')`.
+- Open the Python shell, run `import nltk` then `nltk.download('punkt')` and `nltk.download('reuters')`.
 - In the root of the `csproject` subdirectory of the root, run `python compressors/setup.py build_ext --inplace`.
 - Create a directory named whatever you like (e.g. `build`) in the root of this repository, change directory into it, and run `cmake ../csproject_pairwise_dists/ && make`.
 This will create an executable which can be run as `build/csproject_pairwise_dists $DB` where `$DB` is your database filename.
