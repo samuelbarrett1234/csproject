@@ -157,6 +157,7 @@ def get_evaluation_sequences_with_k(lbltype, k):  # pick `k` train samples for e
             # yield both ways round
             yield (A_seqid, B_seqid, B_seqpart)
             yield (B_seqid, A_seqid, B_seqpart)
+        cur.execute("DROP TABLE ChosenSeqs1")
 
     return f
 
@@ -242,7 +243,7 @@ if __name__ == "__main__":
     parser.add_argument("db", type=str,
                         help="Filename of the DB to load.")
     parser.add_argument("lbltype", type=str,
-                        help="The label type to use to generate pair data.")
+                        help="The label type to use to generate pair data. Or '*' for all.")
     parser.add_argument("k", type=int,
                         help="Higher means more data, hence more accurate classifiers.")
     parser.add_argument("--use-comma", type=str, default=None,
@@ -264,11 +265,19 @@ if __name__ == "__main__":
     cur = db.cursor()
     cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
-    cur.execute("SELECT 1 FROM LabelTypes WHERE lbltype_name = ?",
-                (args.lbltype,))
-    if cur.fetchone() is None:
-        print("Error: label type '", args.lbltype, "' does not exist.")
-        exit(-1)
+    if args.lbltype == '*':
+        cur.execute("SELECT lbltype_name FROM LabelTypes")
+        args.lbltype = list(
+            map(lambda t: t[0],
+                cur.fetchall())
+        )
+    else:
+        cur.execute("SELECT 1 FROM LabelTypes WHERE lbltype_name = ?",
+                    (args.lbltype,))
+        if cur.fetchone() is None:
+            print("Error: label type '", args.lbltype, "' does not exist.")
+            exit(-1)
+        args.lbltype = [args.lbltype]
 
     assert(args.k > 0)
 
@@ -293,11 +302,12 @@ if __name__ == "__main__":
         db, comma_id,
         pgb.progressbar(
             itertools.chain(
+                *[get_evaluation_sequences_with_k(lbltype, args.k)(db)
+                  for lbltype in args.lbltype],
                 get_reflexive_sequences(db),
                 get_cyclic_shift_train_pairing(db),
                 get_random_train_pairing(db),
                 #get_val_seq_lbl_matrix(args.lbltype, args.k)(db),
-                get_evaluation_sequences_with_k(args.lbltype, args.k)(db),
             )
         ),
         args.squash_start_end

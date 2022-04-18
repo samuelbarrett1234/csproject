@@ -22,8 +22,6 @@ However, if you are using a pretrained model, this will cause an error at traini
 Instead in this case, you must pass the token which denotes the separator.
 For BERT's NLP tokenisation, this is the `[SEP]` token, so you would add `--use-comma "[SEP]"` to the command.
 You must also use `--squash-start-end` for NLP BERT-tokenised data.
-If you have multiple label types and you want to pair them all up in a single command, the following may be useful:
-`sqlite3 <DB-FILENAME> "SELECT lbltype_name FROM LabelTypes" | xargs -I {} python pair_up.py <DB-FILENAME> {} <YOUR-K-HERE> --use-comma "[SEP]" --squash-start-end`
 - Once the data has been paired-up, it's time to start compressing it, using `compress.py`.
 It applies the compressor to all of the data in the DB.
 Some compressors have to train first, like the BERT compressor.
