@@ -60,6 +60,30 @@ def parse_config(config_str):
                     yield stmt[0], stmt[1]
 
 
+class SequenceIterator:
+    """Given a sequence of IDs, generate the actual sequences.
+    The main point of using this class rather than a Python
+    generator is for length calculation.
+    """
+    def __init__(self, db, ids_iterator):
+        self.cur = db.cursor()
+        self.ids = ids_iterator
+        self.cur_id = None
+
+    def __len__(self):
+        return len(self.ids)
+
+    def __iter__(self):
+        self.cur_id = iter(self.ids)
+        return self
+
+    def __next__(self):
+        seqid = next(self.cur_id)
+        self.cur.execute("SELECT tokid FROM SequenceValues WHERE seqid = ? "
+                         "ORDER BY svidx ASC", (seqid,))
+        return list(map(lambda t: t[0], self.cur.fetchall()))
+
+
 if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("db", type=str,
@@ -135,34 +159,27 @@ if __name__ == "__main__":
 
     # ITERATORS
 
-    def create_seq_iterator(ids_iterator):  # given an iterator over sequence IDs, yield their tokens
-        cur = db.cursor()
-        for id in ids_iterator:
-            cur.execute("SELECT tokid FROM SequenceValues WHERE seqid = ? "
-                        "ORDER BY svidx ASC", (id,))
-            yield list(map(lambda t: t[0], cur.fetchall()))
-
     def iterate_over_all():
         # it is very important that the ordering of the returned IDs
         # is not arbitrary
         cur = db.cursor()
         cur.execute("SELECT seqid FROM Sequences ORDER BY seqid ASC")
-        return map(lambda t: t[0], cur.fetchall())
+        return list(map(lambda t: t[0], cur.fetchall()))
 
     def iterate_over_part(part, shuffle):
         cur = db.cursor()
         s = ("ORDER BY RANDOM()" if shuffle else "ORDER BY seqid ASC")
         cur.execute("SELECT seqid FROM Sequences WHERE seqpart = ? " + s, (part,))
-        return map(lambda t: t[0], cur.fetchall())
+        return list(map(lambda t: t[0], cur.fetchall()))
 
     def iter_train():
-        return create_seq_iterator(iterate_over_part(0, True))
+        return SequenceIterator(db, iterate_over_part(0, True))
 
     def iter_val():
-        return create_seq_iterator(iterate_over_part(1, False))
+        return SequenceIterator(db, iterate_over_part(1, False))
 
     def iter_all():
-        return create_seq_iterator(iterate_over_all())
+        return SequenceIterator(db, iterate_over_all())
 
     # NOW CONSTRUCT COMPRESSOR
 
@@ -209,11 +226,10 @@ if __name__ == "__main__":
     compress_time_before = time.perf_counter()
     cur.executemany(
         "INSERT INTO CompressionSizes(compid, seqid, compsz) VALUES (?, ?, ?)",
-        pgb.progressbar(
-            map(
-                lambda data_seqid: (compid, data_seqid[1], len(data_seqid[0])),
-                zip(comp.compressmany(iter_all()), iterate_over_all())
-            )
+        map(
+            lambda data_seqid: (compid, data_seqid[1], len(data_seqid[0])),
+            # progressbar is hidden in here so it can access the __len__
+            zip(comp.compressmany(pgb.progressbar(iter_all())), iterate_over_all())
         ))
     compress_time_after = time.perf_counter()
 
