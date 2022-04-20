@@ -249,3 +249,15 @@ CREATE TABLE PairwiseDistances(
     dist REAL NOT NULL,
     PRIMARY KEY(compid, ncd_formula, dist_aggregator, seqid_1, seqid_2)
 );
+
+
+CREATE TABLE Cuts(
+    lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype),  -- a binary label type
+    compid INTEGER NOT NULL REFERENCES Compressors(compid),
+    ncd_formula TEXT NOT NULL,
+    dist_aggregator TEXT NOT NULL,
+    seqpart INTEGER NOT NULL,
+    n_rand INTEGER NOT NULL,  -- if 0 not randomised (true value), else randomised index (sorted ascending)
+    cut_value REAL NOT NULL,  -- the weight of the cut
+    PRIMARY KEY(lbltype, compid, ncd_formula, dist_aggregator, seqpart, n_rand)
+);
