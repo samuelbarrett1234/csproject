@@ -47,6 +47,10 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur1 = db.cursor()
+
+    cur1.execute("PRAGMA CACHE_SIZE")
+    cur1.execute(f"PRAGMA CACHE_SIZE = {cur1.fetchone()[0] * 100}")  # use 100x the previous cache size
+
     cur1.execute("PRAGMA FOREIGN_KEYS = ON")
 
     cur1.execute("""

@@ -28,7 +28,11 @@ if __name__ == "__main__":
 
     db = sql.connect(args.db)
     cur = db.cursor()
-    cur.execute("PRAGMA FOREIGN_KEYS = ON")
+
+    cur.execute("PRAGMA CACHE_SIZE")
+    cur.execute(f"PRAGMA CACHE_SIZE = {cur.fetchone()[0] * 100}")  # use 100x the previous cache size
+
+    cur.execute("PRAGMA FOREIGN_KEYS = OFF")
 
     cur.execute("DELETE FROM NCDValues")
     cur.execute("DELETE FROM Predictions")
@@ -36,6 +40,8 @@ if __name__ == "__main__":
     cur.execute("DELETE FROM ResultAccuracies")
     cur.execute("DELETE FROM TrainingPairings")
     cur.execute("DELETE FROM PairwiseDistances")
+
+    cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     db.commit()
     db.close()
