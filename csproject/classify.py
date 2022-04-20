@@ -123,8 +123,8 @@ def execute(db, predictor, predictor_name):
         cur.execute("""
         WITH Labellings AS (
             SELECT seqid_other AS seqid, lbltype, ncd_formula, compid,
-            CLASSIFY(lbl, ncd_value) AS lbl
-            FROM TrainingPairings
+            CLASSIFY(Labels.lbl, ncd_value) AS lbl
+            FROM TrainingPairings JOIN Labels ON seqid_train = Labels.seqid
             GROUP BY seqid_other, lbltype, ncd_formula, compid
         )
         SELECT ?, lbltype, ncd_formula, compid, seqid, lbl
