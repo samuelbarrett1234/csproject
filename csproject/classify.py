@@ -5,6 +5,7 @@ this script uses different classification methods to classify the labels.
 
 
 import os
+import copy
 import math
 import heapq
 import argparse as ap
@@ -13,36 +14,35 @@ import progressbar as pgb
 
 
 class KNNClassificationAggregator:
-    """An SQLite aggregation function for performing K-nearest-neighbour
+    """A structure for performing K-nearest-neighbour
     classification.
     """
     def __init__(self, k):
         self.k = k
-        self.data = []  # heap, mapping distances to labels
+        self.data = []  # heap, mapping distances to training sequences
 
-    def step(self, lbl, dist):
-        heapq.heappush(self.data, (dist, lbl))
+    def step(self, seqid_train, dist):
+        heapq.heappush(self.data, (dist, seqid_train))
 
-    def finalize(self):
+    def predict(self, lbl_map):
         # extract top K elements, put them
         # into a dict which maps each label
         # to its frequency
         top = {}
+        data_copy = copy.copy(self.data)
         for _ in range(self.k):
             # if there are fewer than k data points
-            if len(self.data) == 0:
+            if len(data_copy) == 0:
                 break
 
-            lbl = heapq.heappop(self.data)[1]
+            seqid_train = heapq.heappop(data_copy)[1]
+            lbl = lbl_map[seqid_train]
             if lbl not in top:
                 top[lbl] = 1
             else:
                 top[lbl] += 1
 
         assert(len(top) > 0)
-
-        # reset heap
-        self.data = []
 
         # return vote
         max_freq = max(top.values())
@@ -52,38 +52,41 @@ class KNNClassificationAggregator:
 
 
 class AvgDistClassificationAggregator:
-    """An SQLite aggregation function for classifying
+    """A structure for classifying
     points based on their average distance.
     """
     def __init__(self, log=True):
         self.log = log
-        self.data = {}  # mapping from labels to NCD distances
+        self.data = {}  # mapping from seqid_train to NCD distance
 
-    def step(self, lbl, dist):
+    def step(self, seqid_train, dist):
         if self.log:
             dist = math.log(max(dist, 1.0e-9))
 
-        if lbl not in self.data:
-            self.data[lbl] = []
+        self.data[seqid_train] = dist
 
-        self.data[lbl].append(dist)
-
-    def finalize(self):
-        try:
-            self.data = dict([
-                (lbl, sum(vs) / len(vs)) for lbl, vs in self.data.items()
-            ])
-            # return lowest avg
-            min_v = min(self.data.values())
-            for lbl, v in self.data.items():
-                if v == min_v:
-                    return lbl
-        finally:
-            self.data = {}  # reset
+    def predict(self, lbl_map):
+        # convert to mapping from labels to distances
+        lbl_data = {}
+        for seqid_train, dist in self.data.items():
+            lbl = lbl_map[seqid_train]
+            if lbl not in lbl_data:
+                lbl_data[lbl] = [dist]
+            else:
+                lbl_data[lbl].append(dist)
+        # convert to mapping from labels to average distances
+        lbl_data = dict([
+            (lbl, sum(vs) / len(vs)) for lbl, vs in lbl_data.items()
+        ])
+        # return lowest avg
+        min_v = min(lbl_data.values())
+        for lbl, v in lbl_data.items():
+            if v == min_v:
+                return lbl
 
 
 class QuantileClassificationAggregator:
-    """An SQLite aggregation function for classifying
+    """A structure for classifying
     points based on a quantile distance between the
     distance distributions. Lower quantile values mean
     comparisons closer to the minimum.
@@ -92,49 +95,121 @@ class QuantileClassificationAggregator:
         quantile = float(quantile)
         assert(quantile >= 0.0 and quantile < 1.0)
         self.quantile = quantile
-        self.data = {}  # mapping from labels to NCD distances
+        self.data = {}  # mapping from seqid_train to NCD distance
 
-    def step(self, lbl, dist):
-        if lbl not in self.data:
-            self.data[lbl] = []
+    def step(self, seqid_train, dist):
+        self.data[seqid_train] = dist
 
-        self.data[lbl].append(dist)
+    def predict(self, lbl_map):
+        # convert to mapping from labels to distances
+        lbl_data = {}
+        for seqid_train, dist in self.data.items():
+            lbl = lbl_map[seqid_train]
+            if lbl not in lbl_data:
+                lbl_data[lbl] = [dist]
+            else:
+                lbl_data[lbl].append(dist)
+        # convert to mapping from labels to the right quantile
+        lbl_data = dict([
+            (lbl, sorted(vs)[int(self.quantile * len(vs))]) for lbl, vs in lbl_data.items()
+        ])
+        # return class associated with the lowest quantile
+        min_v = min(lbl_data.values())
+        for lbl, v in lbl_data.items():
+            if v == min_v:
+                return lbl
 
-    def finalize(self):
-        try:
-            self.data = dict([
-                (lbl, sorted(vs)[int(self.quantile * len(vs))]) for lbl, vs in self.data.items()
-            ])
-            # return class associated with the lowest quantile
-            min_v = min(self.data.values())
-            for lbl, v in self.data.items():
-                if v == min_v:
-                    return lbl
-        finally:
-            self.data = {}  # reset
 
-
-def execute(db, predictor, predictor_name):
-    cur = db.cursor()
-    db.create_aggregate("CLASSIFY", 2,
-                        predictor)
-
-    try:
-        cur.execute("""
-        WITH Labellings AS (
-            SELECT seqid_other AS seqid, lbltype, ncd_formula, compid,
-            CLASSIFY(Labels.lbl, ncd_value) AS lbl
-            FROM TrainingPairings JOIN Labels ON seqid_train = Labels.seqid
-            GROUP BY seqid_other, lbltype, ncd_formula, compid
+class NCDDataGetter:
+    def __init__(self, db):
+        self.cur = db.cursor()
+        # more reasons why I don't like SQLite
+        self.cur.execute(
+            "SELECT DISTINCT compid, ncd_formula, seqid_other "
+            "FROM TrainingPairings"
         )
-        SELECT ?, lbltype, ncd_formula, compid, seqid, lbl
-        FROM Labellings
-        """, (predictor_name,))
-        return cur.fetchall()
+        self.L = 0
+        while self.cur.fetchone() is not None:
+            self.L += 1
 
-    finally:
-        # to clean up, delete the aggregation function
-        db.create_aggregate("CLASSIFY", 2, None)
+    def __len__(self):
+        return self.L
+
+    def __iter__(self):
+        self.cur.execute("""
+        SELECT compid, ncd_formula, seqid_other, seqid_train, ncd_value
+        FROM TrainingPairings
+        ORDER BY compid, ncd_formula, seqid_other
+        """)
+        self.cur_row = self.cur.fetchone()
+        return self
+
+    def __next__(self):
+        if self.cur_row is None:
+            raise StopIteration()
+
+        idx = self.cur_row[:3]
+        data = []
+        while self.cur_row is not None and self.cur_row[:3] == idx:
+            data.append(self.cur_row[3:])
+            self.cur_row = self.cur.fetchone()
+
+        return (idx, data)
+
+
+class Executor:
+    def __init__(self, db, predictor, predictor_name):
+        self.predictor = predictor
+        self.pred_name = predictor_name
+        self.ncd_getter = NCDDataGetter(db)
+        self.cur = db.cursor()
+        self.cur.execute("""
+        WITH RelevantTrain AS (
+            SELECT DISTINCT seqid_train AS seqid
+            FROM TrainingPairings
+        )
+        SELECT lbltype, seqid, lbl
+        FROM RelevantTrain NATURAL JOIN Labels
+        """)
+        self.lblmaps = {}
+        for lbltype, seqid, lbl in self.cur.fetchall():
+            if lbltype not in self.lblmaps:
+                self.lblmaps[lbltype] = {}
+            self.lblmaps[lbltype][seqid] = lbl
+        self.cur.execute("SELECT lbltype FROM LabelTypes")
+        self.lbltypes = list(map(lambda t: t[0], self.cur.fetchall()))
+
+    def __len__(self):
+        return len(self.lbltypes) * len(self.ncd_getter)
+
+    def __iter__(self):
+        self.ncd_iter = iter(self.ncd_getter)
+        self.lbltype_index = len(self.lbltypes)
+        self.idx = None
+        self.done = False
+        return self
+
+    def __next__(self):
+        if self.lbltype_index == len(self.lbltypes):
+            if self.done:
+                raise StopIteration()
+
+            try:
+                self.idx, data = next(self.ncd_iter)
+            except StopIteration:
+                self.done = True
+
+            self.lbltype_index = 0
+            self.pred = self.predictor()
+
+            for seqid_train, dist in data:
+                self.pred.step(seqid_train, dist)
+
+        # get current label type and then advance
+        lbltype = self.lbltypes[self.lbltype_index]
+        self.lbltype_index += 1
+        # now actually return the result
+        return (self.pred_name, lbltype,) + self.idx + (self.pred.predict(self.lblmaps[lbltype]),)
 
 
 if __name__ == "__main__":
@@ -175,10 +250,10 @@ if __name__ == "__main__":
     cur = db.cursor()
     cur.execute("PRAGMA FOREIGN_KEYS = ON")
     cur.executemany("""
-    INSERT INTO Predictions(predictor, lbltype, ncd_formula, compid, seqid, lbl)
+    INSERT INTO Predictions(predictor, lbltype, compid, ncd_formula, seqid, lbl)
     VALUES (?, ?, ?, ?, ?, ?)
     """,
-    pgb.progressbar(execute(db, PREDICTOR, PREDICTOR_NAME))
+    pgb.progressbar(Executor(db, PREDICTOR, PREDICTOR_NAME))
     )
 
     db.commit()
