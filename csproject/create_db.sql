@@ -64,6 +64,17 @@ CREATE TABLE Labels(
 CREATE INDEX lbl_idx ON Labels(lbltype, lbl, seqid);
 CREATE INDEX lbl_idx_2 ON Labels(seqid, lbltype);
 
+-- for each label type, which label is the most common amongst the training set?
+CREATE VIEW ModalClasses AS
+WITH class_counts AS (
+	SELECT lbltype, lbl, COUNT(seqid) AS n
+	FROM Sequences NATURAL JOIN Labels
+	WHERE seqpart = 0
+	GROUP BY lbltype, lbl
+)
+SELECT lbltype, lbl, MAX(n) FROM class_counts
+GROUP BY lbltype;
+
 CREATE TABLE SequencePairings(
     -- INVARIANT: `seqid_out.seq_is_pair = 1`,
     -- `seqid_left.seq_is_pair = 0`, `seqid_right.seq_is_pair = 0`
@@ -182,6 +193,12 @@ CREATE VIEW BestCompPredMethod AS
 SELECT lbltype, compid, predictor, ncd_formula, MAX(val_acc) AS val_acc, test_acc
 FROM ResultAccuracies
 GROUP BY lbltype, compid;
+
+-- what accuracy does the "modal classifier" achieve?
+CREATE VIEW ModalAccuracies AS
+SELECT lbltype, AVG(CASE WHEN Labels.lbl = ModalClasses.lbl THEN 1 ELSE 0 END) AS modal_acc
+FROM Sequences NATURAL JOIN Labels JOIN ModalClasses USING (lbltype)
+GROUP BY lbltype;
 
 
 CREATE VIEW ResultSizes AS
