@@ -5,7 +5,6 @@ Requires that the table `PairwiseDistances` be filled out.
 """
 
 
-from contextlib import redirect_stdout
 import os
 import argparse as ap
 import sqlite3 as sql
@@ -61,7 +60,7 @@ def get_cut_and_rands(db, G, lbltype, seqpart, n_rand):
         null_scores.append(nx.cut_size(
             G, np.argwhere(y_randoms == 1)[:, 0], weight='weight'))
 
-    return true_score, np.sort(null_scores)
+    return true_score, sorted(null_scores)
 
 
 def get_loop(db):
