@@ -15,6 +15,8 @@ for a given NCD formula, together with the labels associated with each of the ys
 predict a label for x, which is stored in the Predictions table.
 */
 
+PRAGMA journal_mode = wal;
+
 CREATE TABLE Sequences(
     seqid INTEGER PRIMARY KEY,
     seqpart INTEGER NOT NULL,  -- 0 for train, 1 for val, 2 for test
