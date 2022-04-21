@@ -186,18 +186,11 @@ class Executor:
         self.ncd_iter = iter(self.ncd_getter)
         self.lbltype_index = len(self.lbltypes)
         self.idx = None
-        self.done = False
         return self
 
     def __next__(self):
         if self.lbltype_index == len(self.lbltypes):
-            if self.done:
-                raise StopIteration()
-
-            try:
-                self.idx, data = next(self.ncd_iter)
-            except StopIteration:
-                self.done = True
+            self.idx, data = next(self.ncd_iter)
 
             self.lbltype_index = 0
             self.pred = self.predictor()
