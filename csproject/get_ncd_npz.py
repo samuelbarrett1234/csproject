@@ -38,6 +38,9 @@ def get_dist_matrices(db, seqid_trains, seqid_vals, seqid_tests, compid, ncd_for
         np.std(D_val, axis=0, keepdims=True)
     )
 
+    # avoid division by 0
+    std = np.where(std > 0.0, std, 1.0)
+
     return (D_val - mean) / std, (D_test - mean) / std
 
 
