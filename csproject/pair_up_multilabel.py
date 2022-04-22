@@ -59,9 +59,9 @@ if __name__ == "__main__":
     parser = ap.ArgumentParser()
     parser.add_argument("db", type=str,
                         help="Filename of the DB to load.")
-    parser.add_argument("n", type=int,
-                        help="Number of TRAINING seqs to pick for each label/labeltype.")
     parser.add_argument("m", type=int,
+                        help="Number of TRAINING seqs to pick for each label/labeltype.")
+    parser.add_argument("n", type=int,
                         help="Number of VAL/TEST seqs each to pick for each label/labeltype.")
     parser.add_argument("--use-comma", type=str, default=None,
                         help="If set, use the given token's ID for commas. Else "
