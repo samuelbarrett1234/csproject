@@ -130,7 +130,7 @@ CREATE TABLE Compressors(
 
 CREATE TABLE CompressionSizes(
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
-    compid TEXT NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
+    compid INTEGER NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
     compsz INTEGER NOT NULL,  -- the number of characters that the compressor took the given sequence down to
     PRIMARY KEY(compid, seqid)
 );
@@ -138,7 +138,7 @@ CREATE TABLE CompressionSizes(
 CREATE TABLE NCDValues(
     -- INVARIANT: `seqid.seq_is_pair = 1`
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
-    compid TEXT NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
+    compid INTEGER NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
     ncd_formula TEXT NOT NULL,
     ncd_value REAL NOT NULL,
     PRIMARY KEY(ncd_formula, compid, seqid)
@@ -169,7 +169,7 @@ CREATE INDEX TrainPairIndex ON TrainingPairings(compid, ncd_formula, seqid_other
 CREATE TABLE Predictions(
     -- INVARIANT: `seqid.seq_is_pair = 0`
     seqid INTEGER NOT NULL REFERENCES Sequences(seqid) ON DELETE CASCADE,
-    compid TEXT NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
+    compid INTEGER NOT NULL REFERENCES Compressors(compid) ON DELETE CASCADE,
     ncd_formula TEXT NOT NULL,
     predictor TEXT NOT NULL,
     lbltype INTEGER NOT NULL REFERENCES LabelTypes(lbltype) ON DELETE CASCADE,
@@ -178,15 +178,54 @@ CREATE TABLE Predictions(
 );
 
 
-CREATE TABLE ResultAccuracies(
+CREATE VIEW PredictionEvaluations AS
+SELECT seqid, compid, ncd_formula, predictor, lbltype,
+Predictions.lbl as pred_lbl, Labels.lbl as true_lbl,
+(CASE WHEN Predictions.lbl = Labels.lbl THEN 1 ELSE 0 END) AS correct,
+-- these fields only make sense in the binary case
+(CASE WHEN Predictions.lbl = 1 AND Labels.lbl = 1 THEN 1 ELSE 0 END) AS true_positive,
+(CASE WHEN Predictions.lbl = 0 AND Labels.lbl = 0 THEN 1 ELSE 0 END) AS true_negative,
+(CASE WHEN Predictions.lbl = 1 AND Labels.lbl = 0 THEN 1 ELSE 0 END) AS false_positive,
+(CASE WHEN Predictions.lbl = 0 AND Labels.lbl = 1 THEN 1 ELSE 0 END) AS false_negative
+FROM Predictions JOIN Labels USING (seqid, lbltype);
+
+
+CREATE TABLE Results(
     lbltype INTEGER NOT NULL,
     compid INTEGER NOT NULL,
     predictor TEXT NOT NULL,
     ncd_formula TEXT NOT NULL,
-    val_acc REAL NOT NULL,
-    test_acc REAL NOT NULL,
+
+    val_true_positive INTEGER NOT NULL,
+    val_true_negative INTEGER NOT NULL,
+    val_false_positive INTEGER NOT NULL,
+    val_false_negative INTEGER NOT NULL,
+
+    test_true_positive INTEGER NOT NULL,
+    test_true_negative INTEGER NOT NULL,
+    test_false_positive INTEGER NOT NULL,
+    test_false_negative INTEGER NOT NULL,
+
     PRIMARY KEY(lbltype, compid, predictor, ncd_formula)
 );
+
+
+CREATE VIEW ResultAccuracies AS
+SELECT lbltype, compid, predictor, ncd_formula,
+-- view old fields
+val_true_positive, val_true_negative, val_false_positive, val_false_negative,
+test_true_positive, test_true_negative, test_false_positive, test_false_negative,
+-- compute total counts and correct counts, hence accuracy
+(val_true_positive + val_true_negative + val_false_positive + val_false_negative) AS val_total,
+(test_true_positive + test_true_negative + test_false_positive + test_false_negative) AS test_total,
+(val_true_positive + val_true_negative) AS val_correct,
+(test_true_positive + test_true_negative) AS test_correct,
+val_correct / val_total AS val_acc,
+test_correct / test_total AS test_acc,
+-- compute F1 scores
+val_true_positive / (val_true_positive + 0.5 * (val_false_negative + val_false_positive)) AS val_f1,
+test_true_positive / (test_true_positive + 0.5 * (test_false_negative + test_false_positive)) AS test_f1
+FROM Results;
 
 
 CREATE VIEW BestCompPredMethod AS

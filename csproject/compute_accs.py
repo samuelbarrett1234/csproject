@@ -25,52 +25,63 @@ if __name__ == "__main__":
     cur.execute("PRAGMA FOREIGN_KEYS = ON")
 
     cur.execute(
-    """CREATE TEMP VIEW PredVsTrueOnSeqparts AS
-    WITH PredVsTrue AS (
-        SELECT Predictions.lbltype, compid, predictor, ncd_formula, seqpart,
-        CASE WHEN Predictions.lbl = Labels.lbl THEN 1.0 ELSE 0.0 END AS correct
-        FROM Predictions NATURAL JOIN Sequences
-        JOIN Labels ON Labels.seqid = Predictions.seqid AND Labels.lbltype = Predictions.lbltype
-        WHERE seqpart > 0
-    )
-    SELECT lbltype, compid, predictor, ncd_formula, seqpart, AVG(correct) AS acc
-    FROM PredVsTrue GROUP BY lbltype, compid, predictor, ncd_formula, seqpart
+    """CREATE TEMP TABLE PredVsTrueOnSeqparts AS
+    SELECT lbltype, compid, predictor, ncd_formula, seqpart,
+    SUM(true_positive) AS true_positive, SUM(true_negative) AS true_negative,
+    SUM(false_positive) AS false_positive, SUM(false_negative) AS false_negative
+    FROM PredictionEvaluations NATURAL JOIN Sequences
+    WHERE seqpart > 0
+    GROUP BY lbltype, compid, predictor, ncd_formula, seqpart
     """)
+    cur.execute(
+    """CREATE INDEX pvt_index
+    ON PredVsTrueOnSeqparts(
+        lbltype, compid, predictor, ncd_formula, seqpart)
+    """
+    )
+    cur.execute("SELECT COUNT(*) FROM PredVsTrueOnSeqparts")
+    L = cur.fetchone()[0] // 2
+
+    q_select = """
+    SELECT true_positive, true_negative,
+    false_positive, false_negative
+    FROM PredVsTrueOnSeqparts
+    WHERE lbltype = ? AND compid = ? AND predictor = ?
+    AND ncd_formula = ? AND seqpart = ?
+    """
+    q_insert = """
+    INSERT INTO Results(
+        lbltype, compid, predictor, ncd_formula,
+        val_true_positive, val_true_negative, val_false_positive, val_false_negative,
+        test_true_positive, test_true_negative, test_false_positive, test_false_negative
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
 
     cur2 = db.cursor()
-    cur.execute("SELECT DISTINCT lbltype, compid, predictor, ncd_formula "
-                "FROM PredVsTrueOnSeqparts AS A WHERE NOT EXISTS ("
-                "SELECT 1 FROM ResultAccuracies AS B WHERE A.lbltype = B.lbltype AND "
-                "A.compid = B.compid AND A.predictor = B.predictor AND "
-                "A.ncd_formula = B.ncd_formula)")
-    for lbltype, compid, predictor, ncd_formula in pgb.progressbar(cur.fetchall()):
-        cur2.execute("SELECT acc FROM PredVsTrueOnSeqparts WHERE "
-                     "lbltype = ? AND compid = ? AND predictor = ? AND "
-                     "ncd_formula = ? AND seqpart = ?",
-                     (lbltype, compid, predictor, ncd_formula, 1))
-        val_acc = cur2.fetchone()
+    cur.execute("""
+    SELECT DISTINCT lbltype, compid, predictor, ncd_formula
+    FROM PredVsTrueOnSeqparts
+    EXCEPT
+    SELECT lbltype, compid, predictor, ncd_formula
+    FROM Results
+    """)
+    with pgb.ProgressBar(max_value=L) as pbar:
+        while True:
+            tuple = cur.fetchone()
+            pbar.update(1)
+            if tuple is None:
+                break
 
-        if val_acc is None:
-            print("Error: bad data. Perhaps you forgot to clear old data?")
-            exit(-1)
-        else:
-            val_acc = val_acc[0]
+            lbltype, compid, predictor, ncd_formula = tuple
 
-        cur2.execute("SELECT acc FROM PredVsTrueOnSeqparts WHERE "
-                     "lbltype = ? AND compid = ? AND predictor = ? AND "
-                     "ncd_formula = ? AND seqpart = ?",
-                     (lbltype, compid, predictor, ncd_formula, 2))
-        test_acc = cur2.fetchone()
+            cur2.execute(q_select, (lbltype, compid, predictor, ncd_formula, 1))
+            val_stats = cur2.fetchone()
+            cur2.execute(q_select, (lbltype, compid, predictor, ncd_formula, 2))
+            test_stats = cur2.fetchone()
 
-        if test_acc is None:
-            print("Error: bad data. Perhaps you forgot to clear old data?")
-            exit(-1)
-        else:
-            test_acc = test_acc[0]
-
-        cur2.execute("INSERT INTO ResultAccuracies(lbltype, compid, predictor, ncd_formula, "
-                     "val_acc, test_acc) VALUES (?, ?, ?, ?, ?, ?)",
-                     (lbltype, compid, predictor, ncd_formula, val_acc, test_acc))
+            cur2.execute(q_insert,
+                (lbltype, compid, predictor, ncd_formula,) + val_stats + test_stats)
 
     db.commit()
     db.close()
