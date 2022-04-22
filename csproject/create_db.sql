@@ -220,8 +220,8 @@ test_true_positive, test_true_negative, test_false_positive, test_false_negative
 (test_true_positive + test_true_negative + test_false_positive + test_false_negative) AS test_total,
 (val_true_positive + val_true_negative) AS val_correct,
 (test_true_positive + test_true_negative) AS test_correct,
-val_correct / val_total AS val_acc,
-test_correct / test_total AS test_acc,
+(val_true_positive + val_true_negative) / (val_true_positive + val_true_negative + val_false_positive + val_false_negative) AS val_acc,
+(test_true_positive + test_true_negative) / (test_true_positive + test_true_negative + test_false_positive + test_false_negative) AS test_acc,
 -- compute F1 scores
 val_true_positive / (val_true_positive + 0.5 * (val_false_negative + val_false_positive)) AS val_f1,
 test_true_positive / (test_true_positive + 0.5 * (test_false_negative + test_false_positive)) AS test_f1
