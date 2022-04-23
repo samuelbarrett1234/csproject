@@ -180,10 +180,10 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 	size_t i = 0, i_0 = 0, j = 0;
 
 	// first step: compute minimum NCD value present in `rows`
-	float min_dist = std::numeric_limits<float>::max();
+	float avg_dist = std::numeric_limits<float>::max();
 	for (const auto& row : rows)
-		if (std::get<2>(row) < min_dist && std::get<2>(row) > 0.0f)
-			min_dist = std::get<2>(row);
+		avg_dist += std::get<2>(row);
+	avg_dist /= (float)rows.size();
 
 	// forward j to the point where seqid_other is different
 	// to that of i but has the same seqpart
@@ -208,7 +208,7 @@ int save(sqlite3_stmt* p_insert_stmt, std::vector<std::tuple<int, int, float, in
 			mp_dist = cur_dist;
 			seqid_train = std::get<1>(rows[i]);
 		}
-		similarity_dist += std::exp(-cur_dist / min_dist + 1.0f);
+		similarity_dist += std::exp(-2.0f * std::max(cur_dist, 0.0f) / avg_dist);
 
 		// if end of current seqid_other, need to yield
 		if (std::get<0>(rows[j + 1]) != std::get<0>(rows[j]))
