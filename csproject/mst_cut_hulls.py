@@ -34,7 +34,7 @@ def get_graphs(db):
         compid, ncd_formula, dist_aggregator, seqpart = tuple
 
         cur2.execute(
-            "SELECT seqid_1, seqid_2, seqid_train, dist "
+            "SELECT seqid_1, seqid_2, dist "
             "FROM PairwiseDistances "
             "JOIN Sequences ON seqid_1 = Sequences.seqid "
             "WHERE compid = ? AND ncd_formula = ? AND dist_aggregator = ? AND seqpart = ?",
@@ -43,8 +43,8 @@ def get_graphs(db):
 
         G = nx.from_pandas_edgelist(
             pd.DataFrame(cur2.fetchall(),
-                         columns=["seqid_1", "seqid_2", "seqid_train", "dist"]),
-            "seqid_1", "seqid_2", ["dist", "seqid_train"]
+                         columns=["seqid_1", "seqid_2", "dist"]),
+            "seqid_1", "seqid_2", ["dist"]
         )
 
         yield compid, ncd_formula, dist_aggregator, seqpart, G
@@ -52,6 +52,7 @@ def get_graphs(db):
 
 def get_bipartitions(G):
     G_mst = nx.minimum_spanning_tree(G, weight="dist")
+
     for (u, v) in G_mst.edges():
         G_removed = G_mst.copy()
         G_removed.remove_edge(u, v)
@@ -60,7 +61,7 @@ def get_bipartitions(G):
 
 def calculate_stats(class_freq, precisions, recalls):
     precisions, recalls = np.array(precisions), np.array(recalls)
-    extra_datas = np.array([(1.0, 0.0), (class_freq, 1.0), (0.0, 0.0)])
+    extra_datas = np.array([(1.0, 0.0), (0.0, 1.0), (class_freq, 1.0), (0.0, 0.0)])
     data = np.concatenate((np.stack((precisions, recalls)).T,
                            extra_datas),
                           axis=0)
@@ -103,7 +104,7 @@ def get_rows(db):
 
         for lbltype in lbltypes:
             # compute class frequency:
-            class_freq = 0
+            class_freq = 0.0
             for seqid in G.nodes():
                 class_freq += seqid_lbls[(lbltype, seqid)]
             class_freq /= len(G.nodes())
@@ -114,10 +115,8 @@ def get_rows(db):
                 # calculate number of true/false negatives/positives
                 # along with the class frequency
                 tp, tn, fp, fn = 0, 0, 0, 0
-                class_freq = 0
                 for seqid in G.nodes():
                     if seqid_lbls[(lbltype, seqid)] == 1:
-                        class_freq += 1
                         if seqid in C:
                             tp += 1  # or fn for other way around
                         else:
