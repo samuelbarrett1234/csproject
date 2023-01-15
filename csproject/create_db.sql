@@ -72,7 +72,7 @@ WITH class_counts AS (
 	WHERE seqpart = 0
 	GROUP BY lbltype, lbl
 )
-SELECT lbltype, lbl, MAX(n) FROM class_counts
+SELECT lbltype, lbl, MAX(n) AS class_count FROM class_counts
 GROUP BY lbltype;
 
 CREATE TABLE SequencePairings(
@@ -176,6 +176,7 @@ CREATE TABLE Predictions(
     lbl INTEGER NOT NULL,
     PRIMARY KEY(lbltype, predictor, ncd_formula, compid, seqid)
 );
+CREATE INDEX PredictionsIndex ON Predictions(seqid, lbltype, compid, ncd_formula, predictor);
 
 
 CREATE VIEW PredictionEvaluations AS

@@ -264,6 +264,7 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d,
     last_seqs = None
     last_masks = None
     chunk = 0
+    logps = np.zeros((seqs.shape[0],))
     for masks in mask_arrays:
         if last_seqs is not None:
             # compute which new tokens are being revealed at this
@@ -289,6 +290,7 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d,
             # (we do not need a comma character because Huffman codes
             # form prefix codes.)
             for i in range(len(codes)):
+                logps += np.log(ps[i, new[i] == 1, :][range(len(seqs[i][new[i] == 1])), seqs[i][new[i] == 1]])
                 codes[i] += _compute_joint_code(
                     ps[i, new[i] == 1, :],
                     seqs[i][new[i] == 1],
@@ -296,6 +298,8 @@ def compress_serialisation(model, seqs, mask_arrays, mask_value, d,
                 )
         last_seqs = np.where(masks == 1, mask_value, seqs)
         last_masks = masks
+
+    print("Log likelihood", logps)
 
     return codes
 
